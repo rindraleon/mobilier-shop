@@ -1,0 +1,84 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-background font-body text-body-md text-on-background antialiased;
+  }
+  ::selection {
+    @apply bg-secondary-container;
+  }
+}
+
+@layer components {
+  .container-app {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+  .section {
+    @apply py-14 md:py-20 lg:py-24;
+  }
+  .card {
+    @apply rounded-lg border border-outline-variant/50 bg-surface-container-lowest shadow-card;
+  }
+  .input-field {
+    @apply w-full rounded-lg border border-outline-variant bg-white px-3.5 py-2.5 text-body-md text-on-background outline-none transition placeholder:text-on-surface-variant/50 focus:border-secondary focus:ring-2 focus:ring-secondary/20 disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .thin-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .thin-scroll::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-outline-variant;
+  }
+}
+
+/* Animation d'apparition au scroll */
+.fade-up {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.fade-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Effet hover des cartes produit */
+.product-card {
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.product-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 20px 40px rgba(29, 27, 24, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fade-up {
+    transition: none;
+    transform: none;
+    opacity: 1;
+  }
+  .product-card,
+  .product-card:hover {
+    transition: none;
+    transform: none;
+  }
+  * {
+    animation-duration: 0.01ms !important;
+  }
+}
