@@ -1,99 +1,142 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Heart, ShoppingBag } from "lucide-react";
-import { useCart } from "../../context/CartContext";
-import type { Product } from "../../types";
-import { categoryName, discountRate, formatPrice } from "../../utils/format";
+import { useAddCartItem } from "../../hooks/useCart";
+import { useToggleWishlist } from "../../hooks/useWishlist";
+import { useAuth } from "../../lib/auth/AuthProvider";
+import { discountRate, formatPrice } from "../../utils/format";
+import { isLowStock, isPurchasable, productImageUrl, toNumber } from "../../utils/product";
 import Stars from "../ui/Stars";
+import type { Product } from "../../types/api";
 
 interface ProductCardProps {
   product: Product;
+  /** Identifiants déjà présents dans les favoris (évite un état local). */
+  wishlisted?: boolean;
 }
 
-/**
- * Carte produit réutilisable (boutique, accueil, favoris…).
- */
-export default function ProductCard({ product }: ProductCardProps) {
-  const { addToCart, toggleWishlist, isWishlisted, openCart } = useCart();
-  const promo = discountRate(product.price, product.oldPrice);
-  const wished = isWishlisted(product.id);
-  const outOfStock = product.stock <= 0;
+export default function ProductCard({ product, wishlisted = false }: ProductCardProps) {
+  const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+  const addItem = useAddCartItem();
+  const toggleWishlist = useToggleWishlist();
+
+  const image = productImageUrl(product);
+  const promo = discountRate(product.price, product.compareAtPrice);
+  const purchasable = isPurchasable(product);
+  const lowStock = isLowStock(product.stock);
+  const rating = toNumber(product.ratingAverage);
+
+  const handleAdd = (): void => {
+    // Le panier est serveur : il exige une session (§8).
+    if (!isAuthenticated) {
+      navigate("/connexion", { state: { from: "/boutique" } });
+      return;
+    }
+    if (!purchasable) return;
+    addItem.mutate({ productId: product.id, quantity: 1 });
+  };
+
+  const handleWishlist = (): void => {
+    if (!isAuthenticated) {
+      navigate("/connexion", { state: { from: "/boutique" } });
+      return;
+    }
+    toggleWishlist.mutate({ productId: product.id, name: product.name });
+  };
 
   return (
-    <article className="product-card group relative flex h-full flex-col overflow-hidden rounded-lg border border-outline-variant/40 bg-surface-container-lowest shadow-card">
-      <div className="relative aspect-[4/5] overflow-hidden bg-surface-container">
-        <Link to={`/boutique/${product.slug}`} aria-label={product.name}>
+    <article className="product-card card group relative flex flex-col overflow-hidden">
+      <Link to={"/boutique/" + product.slug} className="relative block aspect-[4/5] overflow-hidden bg-surface-container">
+        {image ? (
           <img
-            src={product.image}
+            src={image}
             alt={product.name}
             loading="lazy"
-            className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
           />
-        </Link>
+        ) : (
+          <div className="flex h-full items-center justify-center text-on-surface-variant">
+            <ShoppingBag size={32} />
+          </div>
+        )}
 
-        {/* Badges */}
-        <div className="absolute left-3 top-3 flex flex-col gap-1.5">
+        <div className="absolute left-3 top-3 flex flex-col items-start gap-1.5">
           {promo > 0 && (
-            <span className="rounded-full bg-red-600 px-2.5 py-1 text-xs font-bold text-white">−{promo} %</span>
+            <span className="rounded-full bg-secondary px-2.5 py-1 text-[11px] font-bold text-on-secondary">
+              −{promo} %
+            </span>
           )}
           {product.isNew && (
-            <span className="rounded-full bg-secondary-container px-2.5 py-1 text-xs font-bold text-on-secondary-container">
+            <span className="rounded-full bg-primary px-2.5 py-1 text-[11px] font-bold text-on-primary">
               Nouveau
             </span>
           )}
-        </div>
-
-        {/* Favoris */}
-        <button
-          onClick={() => toggleWishlist(product.id)}
-          aria-label={wished ? "Retirer des favoris" : "Ajouter aux favoris"}
-          className={`absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 shadow-card backdrop-blur transition-all hover:scale-110 ${
-            wished ? "text-red-500" : "text-primary"
-          }`}
-        >
-          <Heart size={17} className={wished ? "fill-red-500" : ""} />
-        </button>
-
-        {/* Ajout rapide */}
-        {!outOfStock && (
-          <button
-            onClick={() => {
-              if (addToCart(product.id, 1)) openCart();
-            }}
-            aria-label={`Ajouter ${product.name} au panier`}
-            className="absolute bottom-3 right-3 flex h-11 w-11 translate-y-2 items-center justify-center rounded-full bg-primary text-on-primary opacity-0 shadow-card transition-all duration-300 hover:bg-secondary hover:scale-110 group-hover:translate-y-0 group-hover:opacity-100 max-lg:translate-y-0 max-lg:opacity-100"
-          >
-            <ShoppingBag size={18} />
-          </button>
-        )}
-
-        {outOfStock && (
-          <div className="absolute inset-x-0 bottom-0 bg-on-background/60 py-2 text-center text-label-md uppercase tracking-widest text-white backdrop-blur-sm">
-            Rupture de stock
-          </div>
-        )}
-      </div>
-
-      <div className="flex flex-1 flex-col p-4">
-        <p className="text-label-sm uppercase tracking-wide text-on-surface-variant">
-          {categoryName(product.category)}
-        </p>
-        <Link to={`/boutique/${product.slug}`} className="mt-0.5">
-          <h3 className="line-clamp-1 font-display text-headline-sm text-primary transition-colors group-hover:text-secondary">
-            {product.name}
-          </h3>
-        </Link>
-        <div className="mt-1.5 flex items-center gap-2">
-          <Stars value={product.rating} size={13} />
-          <span className="text-label-sm text-on-surface-variant">({product.reviews})</span>
-        </div>
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="text-body-md font-semibold text-primary">{formatPrice(product.price)}</span>
-          {product.oldPrice && (
-            <span className="text-body-sm text-on-surface-variant line-through">
-              {formatPrice(product.oldPrice)}
+          {!purchasable && (
+            <span className="rounded-full bg-white/95 px-2.5 py-1 text-[11px] font-bold text-on-background">
+              Rupture de stock
             </span>
           )}
         </div>
+
+        <button
+          onClick={handleWishlist}
+          aria-label={wishlisted ? "Retirer des favoris" : "Ajouter aux favoris"}
+          aria-pressed={wishlisted}
+          className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-on-surface-variant shadow-card transition-colors hover:text-secondary"
+        >
+          <Heart size={17} className={wishlisted ? "fill-secondary text-secondary" : ""} />
+        </button>
+      </Link>
+
+      <div className="flex flex-1 flex-col p-4">
+        {product.category && (
+          <p className="text-label-sm uppercase tracking-wider text-on-surface-variant">
+            {product.category.name}
+          </p>
+        )}
+
+        <h3 className="mt-1.5 font-display text-headline-sm leading-snug text-primary">
+          <Link to={"/boutique/" + product.slug} className="transition-colors hover:text-secondary">
+            {product.name}
+          </Link>
+        </h3>
+
+        {product.seller && (
+          <p className="mt-1 text-label-sm text-on-surface-variant">par {product.seller.shopName}</p>
+        )}
+
+        <div className="mt-2 flex items-center gap-2">
+          <Stars value={rating} size={13} />
+          <span className="text-label-sm text-on-surface-variant">
+            {rating > 0 ? rating.toFixed(1) : "Nouveau"}
+          </span>
+        </div>
+
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="font-display text-xl text-primary">{formatPrice(product.price)}</span>
+          {product.compareAtPrice && product.compareAtPrice > product.price && (
+            <span className="text-body-sm text-on-surface-variant line-through">
+              {formatPrice(product.compareAtPrice)}
+            </span>
+          )}
+        </div>
+
+        <p className="mt-1 text-label-sm text-on-surface-variant">
+          {product.stock > 0
+            ? lowStock
+              ? `Plus que ${product.stock} en stock`
+              : `${product.stock} en stock`
+            : "Indisponible"}
+        </p>
+
+        <button
+          onClick={handleAdd}
+          disabled={!purchasable || addItem.isPending}
+          className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-body-sm font-semibold text-on-primary transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          <ShoppingBag size={16} />
+          {addItem.isPending ? "Ajout…" : purchasable ? "Ajouter au panier" : "Indisponible"}
+        </button>
       </div>
     </article>
   );

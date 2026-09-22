@@ -1,0 +1,5 @@
+
+VITE_API_URL=/api
+
+# Cible du proxy Vite en développement (ignoré en production).
+VITE_PROXY_TARGET=http://localhost:3000

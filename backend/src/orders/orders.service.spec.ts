@@ -103,7 +103,20 @@ describe('OrdersService', () => {
       ),
   };
   const config = { get: jest.fn().mockReturnValue(10_000) };
-  const dataSource = { transaction: jest.fn(), getRepository: jest.fn() };
+  /**
+   * `findOne()` charge désormais le paiement de la commande via
+   * `dataSource.getRepository(Payment)`. On expose donc un dépôt factice
+   * configurable pour pouvoir vérifier l'attachement du paiement.
+   */
+  const paymentRepo = { findOne: jest.fn().mockResolvedValue(null) };
+  const addressRepo = { findOne: jest.fn().mockResolvedValue(null) };
+  const dataSource = {
+    transaction: jest.fn(),
+    getRepository: jest.fn((entity: unknown) =>
+      // Payment et Address sont chargés explicitement ; tout autre dépôt reste neutre.
+      String((entity as { name?: string })?.name) === 'Payment' ? paymentRepo : addressRepo,
+    ),
+  };
 
   beforeEach(async () => {
     updateQb = fakeUpdateQb();
@@ -326,6 +339,27 @@ describe('OrdersService', () => {
       await expect(
         service.findOne('order-1', { userId: 'admin-1', role: UserRole.ADMIN }),
       ).resolves.toMatchObject({ id: 'order-1' });
+    });
+
+    it('expose le paiement au client propriétaire', async () => {
+      readQb.getOne.mockResolvedValue(makeOrder({ userId: 'user-1' }));
+      const payment = { id: 'pay-1', orderId: 'order-1', status: 'submitted' };
+      paymentRepo.findOne.mockResolvedValue(payment);
+
+      const order = await service.findOne('order-1', customerActor('user-1'));
+
+      expect(order.payment).toEqual(payment);
+    });
+
+    it('ne divulgue pas le paiement global à un vendeur', async () => {
+      readQb.getOne.mockResolvedValue(makeOrder({ userId: 'user-1' }));
+      paymentRepo.findOne.mockResolvedValue({ id: 'pay-1', status: 'submitted' });
+
+      const order = await service.findOne('order-1', sellerActor('seller-1'));
+
+      // §35 : le vendeur voit ses lignes, jamais le paiement global de la commande.
+      expect(order.payment).toBeUndefined();
+      expect(paymentRepo.findOne).not.toHaveBeenCalled();
     });
   });
 });

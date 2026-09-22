@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import type { Product } from "../../types";
+import type { Product } from "../../types/api";
 import ProductCard from "../product/ProductCard";
 import SectionHeading from "../ui/SectionHeading";
 import Reveal from "../ui/Reveal";

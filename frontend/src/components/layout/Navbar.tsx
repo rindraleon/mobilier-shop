@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { Heart, LayoutDashboard, LogOut, Menu, Package, Search, ShoppingBag, User } from "lucide-react";
-import { useCart } from "../../context/CartContext";
-import { useStore } from "../../context/StoreContext";
+import {
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Package,
+  Search,
+  ShoppingBag,
+  Store,
+  User,
+} from "lucide-react";
+import { useCart } from "../../hooks/useCart";
+import { useWishlist } from "../../hooks/useWishlist";
+import { useCartDrawer } from "../../context/CartDrawerContext";
+import { useAuth } from "../../lib/auth/AuthProvider";
 import { NAV_LINKS } from "../../utils/navigation";
 import Avatar from "../ui/Avatar";
+import NotificationsBell from "../notifications/NotificationsBell";
 import MobileMenu from "./MobileMenu";
 import SearchOverlay from "./SearchOverlay";
 
@@ -34,8 +47,11 @@ function IconBtn({ onClick, label, badge = 0, children }: IconBtnProps) {
 }
 
 export default function Navbar() {
-  const { cartCount, openCart, wishlistCount } = useCart();
-  const { user, logout } = useStore();
+  const { isAuthenticated, user, isAdmin, isSeller, isApprovedSeller, logout } = useAuth();
+  const { openCart } = useCartDrawer();
+  // Le panier est serveur : on ne le requête que pour une session active.
+  const { data: cart } = useCart(isAuthenticated);
+  const { data: wishlist } = useWishlist();
   const [mobileOpen, setMobileOpen] = useState<boolean>(false);
   const [searchOpen, setSearchOpen] = useState<boolean>(false);
   const [userMenuOpen, setUserMenuOpen] = useState<boolean>(false);
@@ -51,22 +67,27 @@ export default function Navbar() {
 
   useEffect(() => {
     const onClick = (e: MouseEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) setUserMenuOpen(false);
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async (): Promise<void> => {
     setUserMenuOpen(false);
+    await logout();
     navigate("/");
   };
+
+  const cartCount = cart?.quantity ?? 0;
+  const wishlistCount = wishlist?.length ?? 0;
 
   return (
     <>
       <div className="bg-primary px-4 py-2 text-center text-label-sm text-on-primary">
-        Livraison offerte dès 300 € · Retours gratuits sous 30 jours
+        Livraison offerte dès 1 500 000 Ar · Paiement MVola, Orange Money &amp; Airtel Money
       </div>
 
       <header
@@ -78,9 +99,9 @@ export default function Navbar() {
           <Link
             to="/"
             className="font-display text-2xl font-bold tracking-tight text-primary"
-            aria-label="Anti — retour à l'accueil"
+            aria-label="MOBILIER-SHOP — retour à l'accueil"
           >
-            Anti
+            Mobilier<span className="text-secondary">Shop</span>
           </Link>
 
           <nav className="hidden items-center gap-7 lg:flex" aria-label="Navigation principale">
@@ -113,6 +134,8 @@ export default function Navbar() {
               <ShoppingBag size={21} />
             </IconBtn>
 
+            {isAuthenticated && <NotificationsBell />}
+
             {user ? (
               <div className="relative ml-1 hidden md:block" ref={userMenuRef}>
                 <button
@@ -121,36 +144,50 @@ export default function Navbar() {
                   aria-haspopup="menu"
                   aria-expanded={userMenuOpen}
                 >
-                  <Avatar name={user.name} size="sm" />
+                  <Avatar name={user.fullName} size="sm" />
                   <span className="hidden max-w-[110px] truncate text-body-sm font-medium xl:inline">
-                    {user.name.split(" ")[0]}
+                    {user.firstName}
                   </span>
                 </button>
                 {userMenuOpen && (
                   <div className="absolute right-0 mt-2 w-60 origin-top-right rounded-lg border border-outline-variant/50 bg-white p-2 shadow-card-hover animate-scale-in">
                     <div className="border-b border-surface-container-highest px-3 py-2.5">
-                      <p className="truncate text-body-sm font-semibold text-primary">{user.name}</p>
+                      <p className="truncate text-body-sm font-semibold text-primary">
+                        {user.fullName}
+                      </p>
                       <p className="truncate text-label-sm text-on-surface-variant">{user.email}</p>
                     </div>
                     <div className="mt-2 flex flex-col">
-                      {user.role === "admin" ? (
+                      {isAdmin && (
                         <>
                           <Link
                             to="/admin"
                             onClick={() => setUserMenuOpen(false)}
                             className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-body-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
                           >
-                            <LayoutDashboard size={17} /> Tableau de bord admin
+                            <LayoutDashboard size={17} /> Administration
                           </Link>
                           <Link
-                            to="/admin/produits"
+                            to="/admin/vendeurs"
                             onClick={() => setUserMenuOpen(false)}
                             className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-body-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
                           >
-                            <Package size={17} /> Gérer les produits
+                            <Store size={17} /> Vendeurs à valider
                           </Link>
                         </>
-                      ) : (
+                      )}
+
+                      {isSeller && (
+                        <Link
+                          to={isApprovedSeller ? "/vendeur" : "/devenir-vendeur"}
+                          onClick={() => setUserMenuOpen(false)}
+                          className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-body-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
+                        >
+                          <Store size={17} /> Mon espace vendeur
+                        </Link>
+                      )}
+
+                      {!isAdmin && !isSeller && (
                         <>
                           <Link
                             to="/espace-client"
@@ -168,6 +205,7 @@ export default function Navbar() {
                           </Link>
                         </>
                       )}
+
                       <button
                         onClick={handleLogout}
                         className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-sm text-red-600 transition-colors hover:bg-red-50"

@@ -1,162 +1,182 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Euro, Receipt, ShoppingBag, Users } from "lucide-react";
-import { useStore } from "../../context/StoreContext";
-import { ORDER_STATUS } from "../../utils/constants";
-import type { OrderStatus } from "../../types";
-import { formatDate, formatPrice, monthlyRevenue } from "../../utils/format";
+import {
+  AlertCircle,
+  BarChart3,
+  CreditCard,
+  Package,
+  ShoppingCart,
+  Store,
+  TrendingUp,
+  Users,
+} from "lucide-react";
+import { useAdminDashboard, useAdminAnalytics } from "../../hooks/useAdmin";
+import { usePendingSellers } from "../../hooks/useAdmin";
+import type { AnalyticsRange } from "../../types/api";
+import { formatDate, formatPrice, toChartData } from "../../utils/format";
 import StatCard from "../../components/ui/StatCard";
 import BarChart from "../../components/ui/BarChart";
+import PageLoader from "../../components/ui/PageLoader";
+import EmptyState from "../../components/ui/EmptyState";
+import Button from "../../components/ui/Button";
 import OrderStatusBadge from "../../components/ui/OrderStatusBadge";
+import { Select } from "../../components/ui/Form";
+
+const PERIODS: { id: AnalyticsRange; label: string }[] = [
+  { id: "7d", label: "7 derniers jours" },
+  { id: "30d", label: "30 derniers jours" },
+  { id: "last_month", label: "Mois dernier" },
+  { id: "this_month", label: "Ce mois-ci" },
+  { id: "this_year", label: "Cette année" },
+];
 
 export default function AdminDashboard() {
-  const { orders, users, products } = useStore();
+  const [period, setPeriod] = useState<AnalyticsRange>("30d");
+  const { data: dash, isLoading, isError, refetch } = useAdminDashboard(period);
+  const { data: analytics } = useAdminAnalytics("sales", period);
+  const { data: pendingSellers = [] } = usePendingSellers();
 
-  const validOrders = orders.filter((o) => o.status !== "annulee");
-  const revenue = validOrders.reduce((s, o) => s + o.total, 0);
-  const clients = users.filter((u) => u.role === "client");
-  const avgBasket = validOrders.length ? revenue / validOrders.length : 0;
-  const chartData = monthlyRevenue(orders, 6);
-  const thisMonth = chartData[chartData.length - 1]?.value ?? 0;
-  const lastMonth = chartData[chartData.length - 2]?.value ?? 0;
-  const trend = lastMonth > 0 ? Math.round(((thisMonth - lastMonth) / lastMonth) * 100) : null;
-  const trendPrefix = trend !== null && trend >= 0 ? "+" : "";
-  const trendLabel = trend !== null ? `${trendPrefix}${trend} % vs mois dernier` : undefined;
+  if (isLoading) {
+    return (
+      <div className="py-16">
+        <PageLoader label="Chargement du tableau de bord…" />
+      </div>
+    );
+  }
 
-  const statusCounts = (Object.keys(ORDER_STATUS) as OrderStatus[]).map((id) => ({
-    id,
-    ...ORDER_STATUS[id],
-    count: orders.filter((o) => o.status === id).length,
-  }));
+  if (isError || !dash) {
+    return (
+      <EmptyState
+        title="Impossible de charger le tableau de bord"
+        actionLabel="Réessayer"
+        onAction={() => void refetch()}
+      />
+    );
+  }
 
-  const recentOrders = [...orders]
-    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 5);
-
-  const lowStock = products.filter((p) => p.stock <= 5).sort((a, b) => a.stock - b.stock);
+  const growth = dash.growth.revenuePercent;
 
   return (
     <div>
-      <h1 className="font-display text-headline-lg text-primary">Tableau de bord</h1>
-      <p className="mt-1 text-body-md text-on-surface-variant">Vue d'ensemble de votre boutique.</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-headline-md text-primary">Tableau de bord</h1>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            {formatDate(dash.range.from)} — {formatDate(dash.range.to)}
+          </p>
+        </div>
+        <Select
+          value={period}
+          onChange={(e) => setPeriod(e.target.value as AnalyticsRange)}
+          aria-label="Période"
+          className="w-52"
+        >
+          {PERIODS.map((p) => (
+            <option key={p.id} value={p.id}>
+              {p.label}
+            </option>
+          ))}
+        </Select>
+      </div>
 
-      {/* KPI */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={Euro} label="Chiffre d'affaires" value={formatPrice(revenue)} sub="commandes non annulées" />
         <StatCard
-          icon={ShoppingBag}
+          icon={TrendingUp}
+          label="Chiffre d'affaires"
+          value={formatPrice(dash.revenue)}
+          sub={growth !== null ? `${growth >= 0 ? "+" : ""}${growth.toFixed(1)} % vs période précédente` : "Pas de comparaison"}
+          trend={growth}
+        />
+        <StatCard
+          icon={ShoppingCart}
           label="Commandes"
-          value={orders.length}
-          sub={`${orders.filter((o) => o.status === "en_attente").length} en attente de traitement`}
+          value={dash.orders}
+          sub={`${dash.ordersInProgress} en cours`}
         />
-        <StatCard icon={Users} label="Clients" value={clients.length} sub="comptes enregistrés" />
         <StatCard
-          icon={Receipt}
-          label="Panier moyen"
-          value={formatPrice(avgBasket)}
-          sub={trendLabel}
-          trend={trend}
+          icon={Users}
+          label="Clients"
+          value={dash.customers}
+          sub={`${dash.sellers} vendeur(s)`}
+        />
+        <StatCard
+          icon={Package}
+          label="Produits actifs"
+          value={dash.activeProducts}
+          sub="publiés"
         />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Graphique */}
-        <div className="card p-6 lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="font-display text-headline-sm text-primary">Revenus — 6 derniers mois</h2>
-            {trend !== null && (
-              <span className={`text-body-sm font-semibold ${trend >= 0 ? "text-emerald-600" : "text-red-500"}`}>
-                {trend >= 0 ? "▲" : "▼"} {Math.abs(trend)} % ce mois-ci
-              </span>
-            )}
-          </div>
-          <div className="mt-6">
-            <BarChart data={chartData} formatValue={(v) => (v > 0 ? formatPrice(v).replace(",00", "") : "—")} />
-          </div>
-        </div>
+      <div className="mt-4 grid gap-4 sm:grid-cols-3">
+        <StatCard
+          icon={Store}
+          label="Vendeurs en attente"
+          value={dash.pendingSellers}
+          sub="à examiner"
+        />
+        <StatCard
+          icon={CreditCard}
+          label="Paiements à vérifier"
+          value={dash.pendingPayments}
+          sub="références soumises"
+        />
+        <StatCard
+          icon={BarChart3}
+          label="Panier moyen"
+          value={formatPrice(dash.averageBasket)}
+          sub="par commande"
+        />
+      </div>
 
-        {/* Répartition */}
-        <div className="card p-6">
-          <h2 className="font-display text-headline-sm text-primary">Statuts des commandes</h2>
-          <ul className="mt-5 space-y-3">
-            {statusCounts.map((s) => (
-              <li key={s.id} className="flex items-center gap-3">
-                <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${s.dot}`} />
-                <span className="flex-1 text-body-sm text-on-surface-variant">{s.label}</span>
-                <span className="text-body-sm font-semibold text-primary">{s.count}</span>
+      {pendingSellers.length > 0 && (
+        <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <h2 className="flex items-center gap-2 font-display text-headline-sm text-amber-900">
+            <AlertCircle size={18} /> {pendingSellers.length} demande(s) de vendeur en attente
+          </h2>
+          <ul className="mt-3 flex flex-wrap gap-2">
+            {pendingSellers.slice(0, 6).map((seller) => (
+              <li
+                key={seller.id}
+                className="rounded-full bg-white px-3 py-1.5 text-body-sm text-amber-900"
+              >
+                {seller.shopName}
               </li>
             ))}
           </ul>
-          <Link
-            to="/admin/commandes"
-            className="mt-5 inline-flex items-center gap-1.5 text-label-md text-secondary hover:underline"
-          >
-            Gérer les commandes <ArrowRight size={14} />
-          </Link>
-        </div>
-      </div>
+          <Button as={Link} to="/admin/vendeurs" size="sm" className="mt-4">
+            Examiner les demandes
+          </Button>
+        </section>
+      )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Dernières commandes */}
-        <div className="card overflow-hidden lg:col-span-2">
-          <div className="flex items-center justify-between border-b border-surface-container-highest px-6 py-4">
-            <h2 className="font-display text-headline-sm text-primary">Dernières commandes</h2>
-            <Link to="/admin/commandes" className="text-label-md text-secondary hover:underline">
-              Tout voir
-            </Link>
+      <section className="card mt-6 p-5">
+        <h2 className="font-display text-headline-sm text-primary">Revenus</h2>
+        <div className="mt-4 overflow-x-auto">
+          <div className="min-w-[560px]">
+            <BarChart
+              data={toChartData(analytics?.overTime ?? [])}
+              formatValue={(value) => formatPrice(value)}
+            />
           </div>
-          <ul className="divide-y divide-surface-container-highest">
-            {recentOrders.map((order) => (
-              <li key={order.id} className="flex flex-wrap items-center gap-3 px-6 py-3.5">
-                <span className="font-semibold text-primary">{order.id}</span>
-                <span className="min-w-0 flex-1 truncate text-body-sm text-on-surface-variant">
-                  {order.customerName} · {formatDate(order.createdAt)}
-                </span>
-                <OrderStatusBadge status={order.status} />
-                <span className="w-20 text-right font-semibold text-primary">{formatPrice(order.total)}</span>
+        </div>
+      </section>
+
+      {analytics?.ordersByStatus && (
+        <section className="card mt-6 p-5">
+          <h2 className="font-display text-headline-sm text-primary">Commandes par statut</h2>
+          <ul className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+            {Object.entries(analytics.ordersByStatus).map(([status, count]) => (
+              <li
+                key={status}
+                className="flex flex-col items-start gap-1.5 rounded-lg bg-surface-container-low px-4 py-3"
+              >
+                <OrderStatusBadge status={status as never} />
+                <span className="font-display text-xl text-primary">{count}</span>
               </li>
             ))}
           </ul>
-        </div>
-
-        {/* Stock faible */}
-        <div className="card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-surface-container-highest px-6 py-4">
-            <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
-              <AlertTriangle size={17} className="text-amber-500" /> Stock faible
-            </h2>
-            <Link to="/admin/produits" className="text-label-md text-secondary hover:underline">
-              Gérer
-            </Link>
-          </div>
-          {lowStock.length === 0 ? (
-            <p className="px-6 py-8 text-center text-body-sm text-on-surface-variant">
-              Tous les stocks sont confortables. 👍
-            </p>
-          ) : (
-            <ul className="divide-y divide-surface-container-highest">
-              {lowStock.map((p) => {
-                let stockLabel = `${p.stock} restant`;
-                if (p.stock === 0) stockLabel = "Rupture";
-                else if (p.stock > 1) stockLabel += "s";
-
-                return (
-                  <li key={p.id} className="flex items-center gap-3 px-6 py-3">
-                    <img src={p.image} alt={p.name} className="h-11 w-9 rounded-md object-cover" />
-                    <span className="min-w-0 flex-1 truncate text-body-sm font-medium text-primary">{p.name}</span>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-                        p.stock === 0 ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-800"
-                      }`}
-                    >
-                      {stockLabel}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </div>
-      </div>
+        </section>
+      )}
     </div>
   );
 }

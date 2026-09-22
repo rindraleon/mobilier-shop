@@ -1,4 +1,4 @@
-import { useStore } from "../../context/StoreContext";
+import { useFeaturedProducts, useNewProducts } from "../../hooks/useCatalog";
 import Hero from "../../components/home/Hero";
 import FeatureBar from "../../components/home/FeatureBar";
 import CategorySection from "../../components/home/CategorySection";
@@ -9,9 +9,9 @@ import Testimonials from "../../components/home/Testimonials";
 import BlogTeaser from "../../components/home/BlogTeaser";
 
 export default function Home() {
-  const { products } = useStore();
-  const featured = products.filter((p) => p.featured).slice(0, 4);
-  const news = products.filter((p) => p.isNew).slice(0, 4);
+  // Catalogue servi par l'API : plus aucune donnée en dur.
+  const { data: featured = [] } = useFeaturedProducts(4);
+  const { data: news = [] } = useNewProducts(4);
 
   return (
     <>

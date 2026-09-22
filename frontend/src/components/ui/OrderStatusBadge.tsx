@@ -1,15 +1,17 @@
 import { ORDER_STATUS } from "../../utils/constants";
-import type { OrderStatus } from "../../types";
+import type { OrderStatus } from "../../types/api";
 
 interface OrderStatusBadgeProps {
   status: OrderStatus;
+  className?: string;
 }
 
-export default function OrderStatusBadge({ status }: OrderStatusBadgeProps) {
-  const meta = ORDER_STATUS[status] ?? ORDER_STATUS.en_attente;
+/** Pastille de statut de commande (9 statuts serveur, §24). */
+export default function OrderStatusBadge({ status, className = "" }: OrderStatusBadgeProps) {
+  const meta = ORDER_STATUS[status] ?? ORDER_STATUS.pending_payment;
   return (
     <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${meta.badge}`}
+      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold ${meta.badge} ${className}`}
     >
       {meta.label}
     </span>

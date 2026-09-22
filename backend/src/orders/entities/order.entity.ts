@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { OrderStatus, ShippingMethod } from '../../common/enums';
 import { User } from '../../users/entities/user.entity';
+import type { Payment } from '../../payments/entities/payment.entity';
 import { OrderItem } from './order-item.entity';
 import { OrderStatusHistory } from './order-status-history.entity';
 
@@ -107,6 +108,16 @@ export class Order {
 
   @OneToMany(() => OrderStatusHistory, (history) => history.order, { cascade: true })
   statusHistory!: OrderStatusHistory[];
+
+  /**
+   * Dernier paiement connu de la commande.
+   *
+   * Propriété **non persistée** (aucune décoration TypeORM) : elle est chargée
+   * explicitement par `OrdersService.findOne()` afin d'exposer le paiement sans
+   * introduire de colonne ni de nouvelle migration. On reste ainsi cohérent avec
+   * `OrderResponseDto.payment` tout en gardant le schéma versionné intact.
+   */
+  payment?: Payment | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;

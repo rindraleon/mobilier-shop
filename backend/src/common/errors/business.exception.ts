@@ -69,6 +69,17 @@ export class BusinessException extends HttpException {
     return new BusinessException(message, HttpStatus.BAD_REQUEST, { code, details });
   }
 
+  static tooManyRequests(
+    message: string,
+    code: ErrorCode | string = ErrorCode.TOO_MANY_REQUESTS,
+    details?: unknown,
+  ): BusinessException {
+    return new BusinessException(message, HttpStatus.TOO_MANY_REQUESTS, {
+      code,
+      details,
+    });
+  }
+
   static unprocessable(
     message: string | string[],
     code: ErrorCode | string = ErrorCode.VALIDATION_ERROR,

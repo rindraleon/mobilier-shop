@@ -1,155 +1,140 @@
 import { useMemo, useState } from "react";
-import type { ChangeEvent, FormEvent } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
-import { Banknote, Check, CreditCard, Lock, MapPin, Tag, Truck, Wallet, X } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import { useCart } from "../../context/CartContext";
-import { useStore } from "../../context/StoreContext";
-import type { PromoResult } from "../../context/StoreContext";
+import { Link, useNavigate } from "react-router-dom";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Check, Lock, MapPin, Truck } from "lucide-react";
+import { useCart } from "../../hooks/useCart";
+import { useAddresses, useSaveAddress } from "../../hooks/useAccount";
+import { useCreateOrder } from "../../hooks/useOrders";
+import { useAuth } from "../../lib/auth/AuthProvider";
 import { useToast } from "../../context/ToastContext";
-import type { Address } from "../../types";
-import { FREE_SHIPPING_THRESHOLD, PAYMENT_METHODS, SHIPPING_METHODS } from "../../utils/constants";
+import { addressSchema, emptyAddress } from "../../schemas/address";
+import type { AddressFormInput } from "../../schemas/address";
+import { SHIPPING_METHODS } from "../../utils/constants";
 import { formatPrice } from "../../utils/format";
+import { errorMessage } from "../../utils/errors";
+import { productImageUrl } from "../../utils/product";
 import Breadcrumbs from "../../components/ui/Breadcrumbs";
 import Button from "../../components/ui/Button";
 import { Checkbox, Field, Input } from "../../components/ui/Form";
-import AddressFields, { emptyAddress, validateAddress } from "../../components/ui/AddressFields";
+import PageLoader from "../../components/ui/PageLoader";
+import EmptyState from "../../components/ui/EmptyState";
+import type { ShippingMethod } from "../../types/api";
 
-const paymentIcons: Record<string, LucideIcon> = { card: CreditCard, paypal: Wallet, cod: Banknote };
-
-const formatCardNumber = (v: string): string =>
-  v
-    .replace(/\D/g, "")
-    .slice(0, 16)
-    .replace(/(\d{4})(?=\d)/g, "$1 ");
-
-const formatExpiry = (v: string): string => {
-  const d = v.replace(/\D/g, "").slice(0, 4);
-  return d.length > 2 ? `${d.slice(0, 2)}/${d.slice(2)}` : d;
-};
-
-interface CardForm {
-  number: string;
-  holder: string;
-  expiry: string;
-  cvc: string;
-}
-
-interface CheckoutErrors {
-  [key: string]: string | undefined;
-}
+const steps = [
+  { label: "Panier", done: true },
+  { label: "Informations", active: true },
+  { label: "Paiement" },
+];
 
 export default function Checkout() {
-  const { user, placeOrder, validatePromo, saveAddress } = useStore();
-  const { detailedItems, subtotal, clearCart } = useCart();
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const { data: cart, isLoading } = useCart(true);
+  const { data: addresses = [] } = useAddresses();
+  const createOrder = useCreateOrder();
+  const saveAddress = useSaveAddress();
 
-  const defaultAddress = user?.addresses.find((a) => a.isDefault) || user?.addresses[0] || null;
-  const [addressId, setAddressId] = useState<string>(defaultAddress ? defaultAddress.id ?? "new" : "new");
-  const [addressForm, setAddressForm] = useState<Address>({ ...emptyAddress, fullName: user?.name ?? "" });
+  const [addressId, setAddressId] = useState<string>("new");
+  const [shippingMethod, setShippingMethod] = useState<ShippingMethod>("standard");
   const [saveNewAddress, setSaveNewAddress] = useState<boolean>(true);
-  const [shippingMethod, setShippingMethod] = useState<string>("standard");
-  const [paymentMethod, setPaymentMethod] = useState<string>("card");
-  const [card, setCard] = useState<CardForm>({ number: "", holder: "", expiry: "", cvc: "" });
-  const [promoInput, setPromoInput] = useState<string>("");
-  const [promo, setPromo] = useState<PromoResult | null>(null);
-  const [errors, setErrors] = useState<CheckoutErrors>({});
-  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const totals = useMemo(() => {
-    const discount = +(subtotal * (promo?.ok ? promo.rate : 0)).toFixed(2);
-    const method = SHIPPING_METHODS.find((m) => m.id === shippingMethod) ?? SHIPPING_METHODS[0];
-    const shippingCost = subtotal - discount >= FREE_SHIPPING_THRESHOLD ? 0 : method.price;
-    return { discount, shippingCost, total: +(subtotal - discount + shippingCost).toFixed(2) };
-  }, [subtotal, promo, shippingMethod]);
+  const addressForm = useForm<AddressFormInput>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: {
+      ...emptyAddress,
+      fullName: user?.fullName ?? "",
+      phone: user?.phone ?? "",
+    },
+  });
 
-  if (!user) return <Navigate to="/connexion" state={{ from: "/commande" }} replace />;
-  if (detailedItems.length === 0 && !submitting) {
-    return <Navigate to="/panier" replace />;
+  const items = cart?.items ?? [];
+  const subtotal = cart?.subtotal ?? 0;
+
+  const selected = useMemo(
+    () => SHIPPING_METHODS.find((m) => m.id === shippingMethod) ?? SHIPPING_METHODS[0]!,
+    [shippingMethod],
+  );
+
+  if (isLoading) {
+    return (
+      <div className="py-20">
+        <PageLoader label="Chargement du panier…" />
+      </div>
+    );
   }
 
-  const { id: userId, name: userName, email: userEmail, addresses: userAddresses } = user;
+  if (items.length === 0) {
+    return (
+      <div className="container-app py-12">
+        <EmptyState
+          title="Votre panier est vide"
+          text="Ajoutez des articles avant de passer commande."
+          actionLabel="Voir la boutique"
+          actionTo="/boutique"
+        />
+      </div>
+    );
+  }
 
-  const applyPromo = () => {
-    const result = validatePromo(promoInput);
-    if (!result.ok) {
-      toast(result.error, "error");
-      return;
-    }
-    setPromo(result);
-    toast(`Code ${result.code} appliqué : −${Math.round(result.rate * 100)} % sur votre commande.`);
-  };
+  const onSubmit = addressForm.handleSubmit(async (values) => {
+    try {
+      let resolvedAddressId: string | undefined;
 
-  const validate = (): CheckoutErrors => {
-    const errs: CheckoutErrors = {};
-    if (addressId === "new") {
-      Object.entries(validateAddress(addressForm)).forEach(([k, v]) => {
-        errs[k] = v;
-      });
-    }
-    if (paymentMethod === "card") {
-      if (!card.holder.trim()) errs.holder = "Nom du titulaire requis.";
-      if (card.number.replace(/\s/g, "").length !== 16) errs.number = "Le numéro doit contenir 16 chiffres.";
-      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(card.expiry)) errs.expiry = "Format attendu : MM/AA.";
-      if (!/^\d{3,4}$/.test(card.cvc)) errs.cvc = "3 chiffres.";
-    }
-    return errs;
-  };
+      if (addressId !== "new") {
+        resolvedAddressId = addressId;
+      } else {
+        // Adresse ponctuelle : éventuellement enregistrée dans le carnet.
+        const orderAddress = {
+          fullName: values.fullName,
+          phone: values.phone,
+          addressLine1: values.addressLine1,
+          addressLine2: values.addressLine2 || undefined,
+          postalCode: values.postalCode || undefined,
+          city: values.city,
+          country: values.country || "Madagascar",
+        };
 
-  const submit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const errs = validate();
-    setErrors(errs);
-    if (Object.keys(errs).length) {
-      toast("Veuillez corriger les champs signalés.", "error");
-      return;
-    }
+        if (saveNewAddress) {
+          const saved = await saveAddress.mutateAsync({
+            ...orderAddress,
+            label: values.label || "Adresse de livraison",
+            isDefault: addresses.length === 0,
+          });
+          resolvedAddressId = saved.id;
+        }
 
-    const shippingAddress: Address =
-      addressId === "new"
-        ? { ...addressForm, label: addressForm.label || "Nouvelle adresse" }
-        : userAddresses.find((a) => a.id === addressId) ?? { ...addressForm };
+        const order = await createOrder.mutateAsync({
+          shippingAddress: orderAddress,
+          shippingMethod,
+          saveAddress: saveNewAddress,
+          addressLabel: values.label || undefined,
+        });
+        navigate("/commande/succes/" + order.id, { replace: true });
+        return;
+      }
 
-    if (addressId === "new" && saveNewAddress) {
-      saveAddress(userId, { ...addressForm, isDefault: userAddresses.length === 0 });
-    }
-
-    setSubmitting(true);
-    // Simulation du paiement
-    setTimeout(() => {
-      const order = placeOrder({
-        items: detailedItems.map(({ product, qty }) => ({ productId: product.id, qty })),
-        shippingAddress,
+      const order = await createOrder.mutateAsync({
+        addressId: resolvedAddressId,
         shippingMethod,
-        paymentMethod,
-        promoCode: promo?.ok ? promo.code : null,
-        userId,
-        customerName: userName,
-        customerEmail: userEmail,
       });
-      clearCart();
-      navigate(`/commande/succes/${order.id}`, { replace: true });
-    }, 900);
-  };
-
-  const onAddressChange = (key: string, value: string) => setAddressForm((f) => ({ ...f, [key]: value }));
-  const onCardChange = (key: keyof CardForm) => (e: ChangeEvent<HTMLInputElement>) =>
-    setCard((c) => ({ ...c, [key]: e.target.value }));
-
-  const steps = [
-    { label: "Panier", done: true },
-    { label: "Informations", active: true },
-    { label: "Confirmation" },
-  ];
+      navigate("/commande/succes/" + order.id, { replace: true });
+    } catch (error) {
+      toast(errorMessage(error), "error");
+    }
+  });
 
   return (
     <div className="container-app py-8 lg:py-12">
       <Breadcrumbs
-        items={[{ label: "Accueil", to: "/" }, { label: "Panier", to: "/panier" }, { label: "Commande" }]}
+        items={[
+          { label: "Accueil", to: "/" },
+          { label: "Panier", to: "/panier" },
+          { label: "Commande" },
+        ]}
       />
 
-      {/* Étapes */}
       <ol className="mt-6 flex items-center gap-2 text-label-md sm:gap-4">
         {steps.map((step, i) => (
           <li key={step.label} className="flex items-center gap-2 sm:gap-4">
@@ -172,10 +157,10 @@ export default function Checkout() {
         ))}
       </ol>
 
-      <form onSubmit={submit} className="mt-8 grid gap-8 lg:grid-cols-3" noValidate>
+      <form onSubmit={onSubmit} className="mt-8 grid gap-8 lg:grid-cols-3" noValidate>
         <div className="space-y-6 lg:col-span-2">
           {/* 1. Adresse */}
-          <section className="card p-6">
+          <section className="card p-5 sm:p-6">
             <h2 className="flex items-center gap-3 font-display text-headline-sm text-primary">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-sm font-bold text-on-secondary">
                 1
@@ -183,9 +168,9 @@ export default function Checkout() {
               Adresse de livraison
             </h2>
 
-            {userAddresses.length > 0 && (
+            {addresses.length > 0 && (
               <ul className="mt-5 space-y-3">
-                {userAddresses.map((addr) => (
+                {addresses.map((addr) => (
                   <li key={addr.id}>
                     <label
                       className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
@@ -198,11 +183,11 @@ export default function Checkout() {
                         type="radio"
                         name="address"
                         checked={addressId === addr.id}
-                        onChange={() => setAddressId(addr.id ?? "new")}
+                        onChange={() => setAddressId(addr.id)}
                         className="mt-1 accent-secondary"
                       />
                       <span className="text-body-sm">
-                        <span className="flex items-center gap-2 font-semibold text-primary">
+                        <span className="flex flex-wrap items-center gap-2 font-semibold text-primary">
                           <MapPin size={14} className="text-secondary" />
                           {addr.label || "Adresse"}
                           {addr.isDefault && (
@@ -212,8 +197,9 @@ export default function Checkout() {
                           )}
                         </span>
                         <span className="mt-1 block text-on-surface-variant">
-                          {addr.fullName} — {addr.address}
-                          {addr.address2 ? `, ${addr.address2}` : ""}, {addr.postalCode} {addr.city}, {addr.country}
+                          {addr.fullName} — {addr.addressLine1}
+                          {addr.addressLine2 ? `, ${addr.addressLine2}` : ""}, {addr.city},{" "}
+                          {addr.country}
                         </span>
                         <span className="block text-on-surface-variant">{addr.phone}</span>
                       </span>
@@ -235,38 +221,92 @@ export default function Checkout() {
                       onChange={() => setAddressId("new")}
                       className="accent-secondary"
                     />
-                    <span className="text-body-sm font-semibold text-primary">Utiliser une nouvelle adresse</span>
+                    <span className="text-body-sm font-semibold text-primary">
+                      Utiliser une nouvelle adresse
+                    </span>
                   </label>
                 </li>
               </ul>
             )}
 
             {addressId === "new" && (
-              <div className="mt-5 space-y-4">
-                <AddressFields value={addressForm} onChange={onAddressChange} errors={errors} showLabel />
-                <Checkbox
-                  label="Enregistrer cette adresse dans mon carnet"
-                  checked={saveNewAddress}
-                  onChange={(e) => setSaveNewAddress(e.target.checked)}
-                />
+              <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                <Field
+                  label="Libellé"
+                  error={addressForm.formState.errors.label?.message}
+                  className="sm:col-span-2"
+                >
+                  <Input placeholder="Domicile, Bureau…" {...addressForm.register("label")} />
+                </Field>
+                <Field
+                  label="Destinataire"
+                  required
+                  error={addressForm.formState.errors.fullName?.message}
+                >
+                  <Input {...addressForm.register("fullName")} />
+                </Field>
+                <Field
+                  label="Téléphone"
+                  required
+                  error={addressForm.formState.errors.phone?.message}
+                >
+                  <Input placeholder="+261 34 12 345 67" {...addressForm.register("phone")} />
+                </Field>
+                <Field
+                  label="Adresse"
+                  required
+                  error={addressForm.formState.errors.addressLine1?.message}
+                  className="sm:col-span-2"
+                >
+                  <Input placeholder="Lot II M 12 Bis" {...addressForm.register("addressLine1")} />
+                </Field>
+                <Field
+                  label="Complément"
+                  error={addressForm.formState.errors.addressLine2?.message}
+                  className="sm:col-span-2"
+                >
+                  <Input {...addressForm.register("addressLine2")} />
+                </Field>
+                <Field
+                  label="Code postal"
+                  error={addressForm.formState.errors.postalCode?.message}
+                >
+                  <Input {...addressForm.register("postalCode")} />
+                </Field>
+                <Field label="Ville" required error={addressForm.formState.errors.city?.message}>
+                  <Input {...addressForm.register("city")} />
+                </Field>
+                <Field
+                  label="Pays"
+                  required
+                  error={addressForm.formState.errors.country?.message}
+                >
+                  <Input {...addressForm.register("country")} />
+                </Field>
+
+                <div className="sm:col-span-2">
+                  <Checkbox
+                    label="Enregistrer cette adresse dans mon carnet"
+                    checked={saveNewAddress}
+                    onChange={(e) => setSaveNewAddress(e.target.checked)}
+                  />
+                </div>
               </div>
             )}
           </section>
 
           {/* 2. Livraison */}
-          <section className="card p-6">
+          <section className="card p-5 sm:p-6">
             <h2 className="flex items-center gap-3 font-display text-headline-sm text-primary">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-sm font-bold text-on-secondary">
                 2
               </span>
               Mode de livraison
             </h2>
-            <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {SHIPPING_METHODS.map((method) => {
-                const free = subtotal - totals.discount >= FREE_SHIPPING_THRESHOLD;
-                return (
+            <ul className="mt-5 space-y-3">
+              {SHIPPING_METHODS.map((method) => (
+                <li key={method.id}>
                   <label
-                    key={method.id}
                     className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
                       shippingMethod === method.id
                         ? "border-secondary bg-secondary-container/30"
@@ -280,203 +320,87 @@ export default function Checkout() {
                       onChange={() => setShippingMethod(method.id)}
                       className="mt-1 accent-secondary"
                     />
-                    <span className="flex-1">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="flex items-center gap-2 text-body-sm font-semibold text-primary">
-                          <Truck size={15} className="text-secondary" /> {method.label}
-                        </span>
-                        <span className={`text-body-sm font-semibold ${free ? "text-emerald-600" : "text-primary"}`}>
-                          {free ? "Offerte" : formatPrice(method.price)}
-                        </span>
+                    <span className="flex-1 text-body-sm">
+                      <span className="flex items-center gap-2 font-semibold text-primary">
+                        <Truck size={14} className="text-secondary" /> {method.label}
                       </span>
-                      <span className="mt-1 block text-body-sm text-on-surface-variant">{method.delay}</span>
+                      <span className="mt-0.5 block text-on-surface-variant">{method.delay}</span>
+                    </span>
+                    <span className="text-body-sm font-semibold text-primary">
+                      {method.price === 0 ? "Offerte" : formatPrice(method.price)}
                     </span>
                   </label>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* 3. Paiement */}
-          <section className="card p-6">
-            <h2 className="flex items-center gap-3 font-display text-headline-sm text-primary">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-sm font-bold text-on-secondary">
-                3
-              </span>
-              Paiement
-            </h2>
-            <div className="mt-5 space-y-3">
-              {PAYMENT_METHODS.map(({ id, label, description }) => {
-                const Icon = paymentIcons[id];
-                return (
-                  <div key={id}>
-                    <label
-                      className={`flex cursor-pointer items-center gap-3 rounded-lg border p-4 transition-colors ${
-                        paymentMethod === id
-                          ? "border-secondary bg-secondary-container/30"
-                          : "border-outline-variant hover:border-secondary/60"
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="payment"
-                        checked={paymentMethod === id}
-                        onChange={() => setPaymentMethod(id)}
-                        className="accent-secondary"
-                      />
-                      <Icon size={18} className="text-secondary" />
-                      <span>
-                        <span className="block text-body-sm font-semibold text-primary">{label}</span>
-                        <span className="block text-body-sm text-on-surface-variant">{description}</span>
-                      </span>
-                    </label>
-
-                    {id === "card" && paymentMethod === "card" && (
-                      <div className="mt-4 grid gap-4 rounded-lg bg-surface-container-low p-4 sm:grid-cols-2">
-                        <div className="sm:col-span-2">
-                          <Field label="Numéro de carte" required error={errors.number}>
-                            <Input
-                              inputMode="numeric"
-                              value={card.number}
-                              onChange={(e) =>
-                                setCard((c) => ({ ...c, number: formatCardNumber(e.target.value) }))
-                              }
-                              placeholder="4242 4242 4242 4242"
-                            />
-                          </Field>
-                        </div>
-                        <div className="sm:col-span-2">
-                          <Field label="Titulaire" required error={errors.holder}>
-                            <Input
-                              value={card.holder}
-                              onChange={onCardChange("holder")}
-                              placeholder="CAMILLE MOREAU"
-                            />
-                          </Field>
-                        </div>
-                        <Field label="Expiration" required error={errors.expiry}>
-                          <Input
-                            inputMode="numeric"
-                            value={card.expiry}
-                            onChange={(e) => setCard((c) => ({ ...c, expiry: formatExpiry(e.target.value) }))}
-                            placeholder="MM/AA"
-                          />
-                        </Field>
-                        <Field label="CVC" required error={errors.cvc}>
-                          <Input
-                            inputMode="numeric"
-                            maxLength={4}
-                            value={card.cvc}
-                            onChange={(e) => setCard((c) => ({ ...c, cvc: e.target.value.replace(/\D/g, "") }))}
-                            placeholder="123"
-                          />
-                        </Field>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mt-4 flex items-center gap-2 text-label-sm text-on-surface-variant">
-              <Lock size={14} className="text-secondary" /> Paiement simulé pour cette démonstration — aucune carte
-              n'est débitée.
-            </p>
+                </li>
+              ))}
+            </ul>
           </section>
         </div>
 
         {/* Récapitulatif */}
-        <aside className="h-fit space-y-5 rounded-lg border border-outline-variant/40 bg-surface-container-low p-6 lg:sticky lg:top-24">
-          <h2 className="font-display text-headline-sm text-primary">Votre commande</h2>
+        <aside className="lg:sticky lg:top-24 lg:self-start">
+          <div className="card p-5">
+            <h2 className="font-display text-headline-sm text-primary">Votre commande</h2>
 
-          <ul className="thin-scroll max-h-64 space-y-3 overflow-y-auto">
-            {detailedItems.map(({ product, qty }) => (
-              <li key={product.id} className="flex items-center gap-3">
-                <span className="relative shrink-0">
-                  <img src={product.image} alt={product.name} className="h-14 w-12 rounded-md object-cover" />
-                  <span className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-on-primary">
-                    {qty}
-                  </span>
-                </span>
-                <span className="min-w-0 flex-1 truncate text-body-sm text-on-surface-variant">{product.name}</span>
-                <span className="text-body-sm font-semibold text-primary">
-                  {formatPrice(product.price * qty)}
-                </span>
-              </li>
-            ))}
-          </ul>
+            <ul className="mt-4 max-h-72 space-y-3 overflow-y-auto thin-scroll">
+              {items.map((item) => {
+                const image = productImageUrl(item.product);
+                return (
+                  <li key={item.id} className="flex gap-3">
+                    <span className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-surface-container">
+                      {image ? (
+                        <img src={image} alt={item.product.name} className="h-full w-full object-cover" />
+                      ) : null}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-body-sm font-semibold text-primary">
+                        {item.product.name}
+                      </span>
+                      <span className="block text-label-sm text-on-surface-variant">
+                        {item.quantity} × {formatPrice(item.unitPrice)}
+                      </span>
+                    </span>
+                    <span className="text-body-sm font-semibold text-primary">
+                      {formatPrice(item.lineTotal)}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
 
-          {/* Code promo */}
-          {promo?.ok ? (
-            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-2.5">
-              <span className="flex items-center gap-2 text-body-sm font-semibold text-emerald-700">
-                <Tag size={15} /> {promo.code} (−{Math.round(promo.rate * 100)} %)
-              </span>
-              <button
-                onClick={() => setPromo(null)}
-                aria-label="Retirer le code promo"
-                className="text-emerald-700 hover:text-emerald-900"
-              >
-                <X size={15} />
-              </button>
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              <Input
-                value={promoInput}
-                onChange={(e) => setPromoInput(e.target.value.toUpperCase())}
-                placeholder="Code promo (ex. ANTI10)"
-                aria-label="Code promo"
-              />
-              <Button type="button" variant="outline" onClick={applyPromo} className="shrink-0">
-                Appliquer
-              </Button>
-            </div>
-          )}
-
-          <div className="space-y-2.5 border-t border-outline-variant/50 pt-4 text-body-md">
-            <div className="flex justify-between">
-              <span className="text-on-surface-variant">Sous-total</span>
-              <span className="font-medium">{formatPrice(subtotal)}</span>
-            </div>
-            {totals.discount > 0 && promo?.ok && (
-              <div className="flex justify-between text-emerald-700">
-                <span>Remise {promo.code}</span>
-                <span className="font-medium">−{formatPrice(totals.discount)}</span>
+            <dl className="mt-4 space-y-2 border-t border-surface-container-highest pt-4 text-body-sm">
+              <div className="flex justify-between">
+                <dt className="text-on-surface-variant">Sous-total</dt>
+                <dd className="font-semibold text-primary">{formatPrice(subtotal)}</dd>
               </div>
-            )}
-            <div className="flex justify-between">
-              <span className="text-on-surface-variant">Livraison</span>
-              <span className={`font-medium ${totals.shippingCost === 0 ? "text-emerald-600" : ""}`}>
-                {totals.shippingCost === 0 ? "Offerte" : formatPrice(totals.shippingCost)}
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between border-t border-outline-variant/50 pt-3">
-              <span className="font-semibold text-primary">Total</span>
-              <span className="font-display text-2xl text-primary">{formatPrice(totals.total)}</span>
-            </div>
-            <p className="text-right text-label-sm text-on-surface-variant">TVA incluse</p>
-          </div>
+              <div className="flex justify-between">
+                <dt className="text-on-surface-variant">Livraison</dt>
+                <dd className="text-on-surface-variant">{selected.label}</dd>
+              </div>
+            </dl>
 
-          <Button type="submit" variant="accent" size="lg" className="w-full" disabled={submitting}>
-            {submitting ? (
-              <>
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-on-secondary/40 border-t-on-secondary" />
-                Traitement…
-              </>
-            ) : (
-              <>
-                <Lock size={16} /> Confirmer et payer {formatPrice(totals.total)}
-              </>
-            )}
-          </Button>
+            {/* Le total définitif est calculé et figé par le serveur (§87). */}
+            <p className="mt-4 rounded-lg bg-surface-container-low p-3 text-label-sm text-on-surface-variant">
+              Le montant exact, les frais de livraison et les éventuelles remises sont recalculés
+              par le serveur au moment de la validation.
+            </p>
 
-          <p className="text-center text-label-sm text-on-surface-variant">
-            En confirmant, vous acceptez nos{" "}
-            <Link to="/contact" className="underline hover:text-secondary">
-              conditions générales
+            <Button
+              type="submit"
+              className="mt-5 w-full"
+              size="lg"
+              disabled={createOrder.isPending || saveAddress.isPending}
+            >
+              <Lock size={16} />
+              {createOrder.isPending ? "Validation…" : "Valider la commande"}
+            </Button>
+
+            <Link
+              to="/panier"
+              className="mt-3 block text-center text-body-sm text-on-surface-variant underline-offset-2 hover:underline"
+            >
+              Retour au panier
             </Link>
-            .
-          </p>
+          </div>
         </aside>
       </form>
     </div>

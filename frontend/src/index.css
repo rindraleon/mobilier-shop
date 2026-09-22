@@ -56,14 +56,11 @@
   transform: translateY(0);
 }
 
-/* Effet hover des cartes produit */
+/* Effet hover des cartes produit : ombre uniquement, sans déplacement vertical. */
 .product-card {
-  transition:
-    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
-    box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .product-card:hover {
-  transform: translateY(-6px);
   box-shadow: 0 20px 40px rgba(29, 27, 24, 0.1);
 }
 
@@ -76,7 +73,6 @@
   .product-card,
   .product-card:hover {
     transition: none;
-    transform: none;
   }
   * {
     animation-duration: 0.01ms !important;

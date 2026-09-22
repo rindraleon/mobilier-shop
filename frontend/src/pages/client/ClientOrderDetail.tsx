@@ -1,160 +1,249 @@
-import { Link, Navigate, useParams } from "react-router-dom";
-import { ArrowLeft, Banknote, Check, MapPin, Truck, XCircle } from "lucide-react";
-import { useStore } from "../../context/StoreContext";
-import { ORDER_STEPS, ORDER_STATUS, paymentLabel, shippingLabel } from "../../utils/constants";
-import { formatDate, formatDateTime, formatPrice } from "../../utils/format";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, CreditCard, MapPin, Package, XCircle } from "lucide-react";
+import { useOrder, useCancelOrder } from "../../hooks/useOrders";
+import { formatDate, formatPrice } from "../../utils/format";
+import { ORDER_STATUS, ORDER_STEPS } from "../../utils/constants";
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
 import Button from "../../components/ui/Button";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import EmptyState from "../../components/ui/EmptyState";
+import PageLoader from "../../components/ui/PageLoader";
+import OrderStatusBadge from "../../components/ui/OrderStatusBadge";
+import StatusBadge from "../../components/ui/StatusBadge";
+import { useToast } from "../../context/ToastContext";
+import { errorMessage } from "../../utils/errors";
+
+/** Statuts qui autorisent encore une annulation client (§66). */
+const CANCELLABLE = ["pending_payment", "payment_submitted", "paid"] as const;
 
 export default function ClientOrderDetail() {
   const { id } = useParams<{ id: string }>();
-  const { user, orders } = useStore();
-  const order = orders.find((o) => o.id === id && o.userId === user?.id);
+  const { toast } = useToast();
+  const { data: order, isLoading, isError, refetch } = useOrder(id);
+  const cancelOrder = useCancelOrder();
+  const [confirmOpen, setConfirmOpen] = useState<boolean>(false);
 
-  if (!user || !order) return <Navigate to="/espace-client/commandes" replace />;
+  if (isLoading) {
+    return (
+      <div className="py-16">
+        <PageLoader label="Chargement de la commande…" />
+      </div>
+    );
+  }
 
-  const meta = ORDER_STATUS[order.status];
-  const currentStep = meta.step;
-  const cancelled = order.status === "annulee";
+  if (isError || !order) {
+    return (
+      <EmptyState
+        title="Commande introuvable"
+        text="Cette commande n'existe pas ou ne vous appartient pas."
+        actionLabel="Mes commandes"
+        actionTo="/espace-client/commandes"
+      />
+    );
+  }
+
+  const canCancel = (CANCELLABLE as readonly string[]).includes(order.status);
+  const currentStep = ORDER_STATUS[order.status]?.step ?? 0;
 
   return (
     <div>
-      <Button as={Link} to="/espace-client/commandes" variant="ghost" size="sm" className="-ml-2 mb-4">
-        <ArrowLeft size={16} /> Toutes mes commandes
-      </Button>
+      <Breadcrumbs
+        items={[
+          { label: "Accueil", to: "/" },
+          { label: "Mes commandes", to: "/espace-client/commandes" },
+          { label: order.orderNumber },
+        ]}
+      />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-headline-lg text-primary">Commande {order.id}</h1>
-          <p className="mt-1 text-body-md text-on-surface-variant">Passée le {formatDateTime(order.createdAt)}</p>
+          <h1 className="font-display text-headline-md text-primary">{order.orderNumber}</h1>
+          <p className="mt-1 text-body-sm text-on-surface-variant">
+            Passée le {formatDate(order.createdAt)}
+          </p>
         </div>
-        <span
-          className={`inline-flex items-center gap-2 rounded-full border px-4 py-1.5 text-body-sm font-semibold ${meta.badge}`}
-        >
-          <span className={`h-2 w-2 rounded-full ${meta.dot}`} /> {meta.label}
-        </span>
+        <OrderStatusBadge status={order.status} />
       </div>
 
-      {/* Suivi */}
-      {cancelled ? (
-        <div className="mt-6 flex items-center gap-3 rounded-lg border border-red-200 bg-red-50 p-5 text-body-md text-red-700">
-          <XCircle size={22} className="shrink-0" />
-          Cette commande a été annulée. Si vous avez payé, le remboursement intervient sous 5 jours ouvrés.
-        </div>
-      ) : (
-        <div className="card mt-6 p-6">
-          <h2 className="font-display text-headline-sm text-primary">Suivi de livraison</h2>
-          <ol className="mt-6 grid gap-6 sm:grid-cols-4">
-            {ORDER_STEPS.map((label, i) => {
-              const done = currentStep >= i + 1;
-              return (
-                <li key={label} className="relative flex items-center gap-3 sm:flex-col sm:items-start">
-                  <span
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${
-                      done ? "bg-secondary text-on-secondary" : "bg-surface-container-high text-on-surface-variant"
-                    }`}
-                  >
-                    {done ? <Check size={17} /> : i + 1}
-                  </span>
-                  <div>
-                    <p className={`text-body-sm font-semibold ${done ? "text-primary" : "text-on-surface-variant"}`}>
-                      {label}
-                    </p>
-                    {i === 0 && (
-                      <p className="text-label-sm text-on-surface-variant/70">{formatDate(order.createdAt)}</p>
-                    )}
-                  </div>
-                  {i < ORDER_STEPS.length - 1 && (
-                    <span
-                      className={`absolute left-[18px] top-9 h-6 w-px sm:hidden ${
-                        done && currentStep > i + 1 ? "bg-secondary" : "bg-surface-container-highest"
-                      }`}
-                    />
-                  )}
-                </li>
-              );
-            })}
-          </ol>
-        </div>
+      {/* Fil d'étapes */}
+      {order.status !== "cancelled" && order.status !== "rejected" && (
+        <ol className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {ORDER_STEPS.map((label, index) => {
+            const step = index + 1;
+            const done = currentStep >= step;
+            return (
+              <li key={label} className="flex flex-col gap-1.5">
+                <span
+                  className={`h-1.5 rounded-full ${done ? "bg-secondary" : "bg-surface-container-high"}`}
+                />
+                <span className={`text-label-sm ${done ? "font-semibold text-primary" : "text-on-surface-variant"}`}>
+                  {label}
+                </span>
+              </li>
+            );
+          })}
+        </ol>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-3">
-        {/* Articles */}
-        <div className="card overflow-hidden lg:col-span-2">
-          <h2 className="border-b border-surface-container-highest px-6 py-4 font-display text-headline-sm text-primary">
-            Articles ({order.items.reduce((s, it) => s + it.qty, 0)})
-          </h2>
-          <ul className="divide-y divide-surface-container-highest">
-            {order.items.map((item) => (
-              <li key={item.productId} className="flex items-center gap-4 px-6 py-4">
-                <img src={item.image} alt={item.name} className="h-16 w-14 rounded-md object-cover" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-primary">{item.name}</p>
-                  <p className="text-body-sm text-on-surface-variant">
-                    {item.qty} × {formatPrice(item.price)}
-                  </p>
-                </div>
-                <span className="font-semibold text-primary">{formatPrice(item.price * item.qty)}</span>
-              </li>
-            ))}
-          </ul>
-          <div className="space-y-2 border-t border-surface-container-highest px-6 py-4 text-body-md">
-            <div className="flex justify-between text-on-surface-variant">
-              <span>Sous-total</span> <span>{formatPrice(order.subtotal)}</span>
-            </div>
-            {order.discount > 0 && (
-              <div className="flex justify-between text-emerald-700">
-                <span>Remise {order.promoCode}</span> <span>−{formatPrice(order.discount)}</span>
+      <div className="mt-8 grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <section className="card p-5">
+            <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
+              <Package size={18} className="text-secondary" /> Articles
+            </h2>
+            <ul className="mt-4 divide-y divide-surface-container-high">
+              {order.items.map((item) => (
+                <li key={item.id} className="flex items-center gap-3 py-3">
+                  <span className="h-14 w-14 shrink-0 overflow-hidden rounded-md bg-surface-container">
+                    {item.imageUrl ? (
+                      <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                    ) : null}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    {item.slug ? (
+                      <Link
+                        to={"/boutique/" + item.slug}
+                        className="block truncate text-body-sm font-semibold text-primary hover:text-secondary"
+                      >
+                        {item.name}
+                      </Link>
+                    ) : (
+                      <span className="block truncate text-body-sm font-semibold text-primary">
+                        {item.name}
+                      </span>
+                    )}
+                    <span className="block text-label-sm text-on-surface-variant">
+                      {item.sellerName ?? "Vendeur"} · {formatPrice(item.unitPrice)} l'unité
+                    </span>
+                  </span>
+                  <span className="text-body-sm text-on-surface-variant">× {item.quantity}</span>
+                  <span className="w-24 text-right text-body-sm font-semibold text-primary">
+                    {formatPrice(item.lineTotal)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <dl className="mt-4 space-y-2 border-t border-surface-container-highest pt-4 text-body-sm">
+              <div className="flex justify-between">
+                <dt className="text-on-surface-variant">Sous-total</dt>
+                <dd>{formatPrice(order.subtotal)}</dd>
               </div>
-            )}
-            <div className="flex justify-between text-on-surface-variant">
-              <span>Livraison</span>
-              <span>{order.shippingCost === 0 ? "Offerte" : formatPrice(order.shippingCost)}</span>
-            </div>
-            <div className="flex justify-between border-t border-surface-container-highest pt-2 font-semibold text-primary">
-              <span>Total</span> <span className="font-display text-lg">{formatPrice(order.total)}</span>
-            </div>
-          </div>
+              <div className="flex justify-between">
+                <dt className="text-on-surface-variant">Livraison</dt>
+                <dd>{formatPrice(order.shippingCost)}</dd>
+              </div>
+              <div className="flex justify-between border-t border-surface-container-highest pt-2 text-body-lg">
+                <dt className="font-semibold text-primary">Total</dt>
+                <dd className="font-display text-xl text-primary">{formatPrice(order.total)}</dd>
+              </div>
+            </dl>
+          </section>
+
+          {order.statusHistory.length > 0 && (
+            <section className="card p-5">
+              <h2 className="font-display text-headline-sm text-primary">Historique</h2>
+              <ol className="mt-3 space-y-3">
+                {order.statusHistory.map((entry) => (
+                  <li key={entry.id} className="flex gap-3">
+                    <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-secondary" />
+                    <div>
+                      <OrderStatusBadge status={entry.newStatus} />
+                      {entry.comment && (
+                        <p className="mt-1 text-label-sm text-on-surface-variant">{entry.comment}</p>
+                      )}
+                      <p className="mt-0.5 text-label-sm text-on-surface-variant">
+                        {formatDate(entry.createdAt)}
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+            </section>
+          )}
         </div>
 
-        {/* Infos */}
-        <div className="space-y-6">
-          <div className="card p-6">
-            <h3 className="flex items-center gap-2 font-display text-headline-sm text-primary">
+        <aside className="space-y-6">
+          <section className="card p-5">
+            <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
               <MapPin size={18} className="text-secondary" /> Livraison
-            </h3>
-            <div className="mt-3 text-body-sm text-on-surface-variant">
-              <p className="font-semibold text-primary">{order.shippingAddress.fullName}</p>
-              <p>
-                {order.shippingAddress.address}
-                {order.shippingAddress.address2 ? `, ${order.shippingAddress.address2}` : ""}
-              </p>
-              <p>
-                {order.shippingAddress.postalCode} {order.shippingAddress.city}
-              </p>
-              <p>{order.shippingAddress.country}</p>
-              <p className="mt-2">{order.shippingAddress.phone}</p>
-            </div>
-            <p className="mt-4 flex items-center gap-2 border-t border-surface-container-highest pt-4 text-body-sm text-on-surface-variant">
-              <Truck size={15} className="text-secondary" /> {shippingLabel(order.shippingMethod)}
-            </p>
-          </div>
+            </h2>
+            <address className="mt-3 not-italic text-body-sm text-on-surface-variant">
+              {order.shippingAddress.fullName}
+              <br />
+              {order.shippingAddress.addressLine1}
+              {order.shippingAddress.addressLine2 ? (
+                <>
+                  <br />
+                  {order.shippingAddress.addressLine2}
+                </>
+              ) : null}
+              <br />
+              {order.shippingAddress.city}, {order.shippingAddress.country}
+              <br />
+              {order.shippingAddress.phone}
+            </address>
+          </section>
 
-          <div className="card p-6">
-            <h3 className="flex items-center gap-2 font-display text-headline-sm text-primary">
-              <Banknote size={18} className="text-secondary" /> Paiement
-            </h3>
-            <p className="mt-3 text-body-md text-on-surface-variant">{paymentLabel(order.paymentMethod)}</p>
-            <p className="mt-1 font-display text-xl text-primary">{formatPrice(order.total)}</p>
-          </div>
+          {order.payment && (
+            <section className="card p-5">
+              <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
+                <CreditCard size={18} className="text-secondary" /> Paiement
+              </h2>
+              <div className="mt-3 space-y-2 text-body-sm">
+                <StatusBadge kind="payment" status={order.payment.status} />
+                <p className="text-on-surface-variant">
+                  Réf. <span className="text-primary">{order.payment.transactionReference}</span>
+                </p>
+                <p className="text-on-surface-variant">{formatPrice(order.payment.amount)}</p>
+              </div>
+              {order.status === "pending_payment" && (
+                <Button
+                  as={Link}
+                  to={"/commande/succes/" + order.id}
+                  className="mt-4 w-full"
+                  size="sm"
+                >
+                  Envoyer ma référence
+                </Button>
+              )}
+            </section>
+          )}
 
-          <div className="rounded-lg bg-secondary-container/40 p-5 text-center">
-            <p className="text-body-sm text-on-secondary-container">Une question sur cette commande ?</p>
-            <Button as={Link} to="/contact" variant="outline" size="sm" className="mt-3">
-              Contacter le service client
+          {canCancel && (
+            <Button
+              variant="outline"
+              className="w-full text-red-600"
+              onClick={() => setConfirmOpen(true)}
+            >
+              <XCircle size={16} /> Annuler ma commande
             </Button>
-          </div>
-        </div>
+          )}
+
+          <Button as={Link} to="/espace-client/commandes" variant="ghost" className="w-full">
+            <ArrowLeft size={16} /> Retour aux commandes
+          </Button>
+        </aside>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          setConfirmOpen(false);
+          cancelOrder.mutate(
+            { id: order.id },
+            {
+              onError: (error: unknown) => toast(errorMessage(error), "error"),
+              onSuccess: () => void refetch(),
+            },
+          );
+        }}
+        title="Annuler la commande"
+        message="Les articles seront remis en stock. Cette action est définitive."
+        confirmLabel="Annuler la commande"
+      />
     </div>
   );
 }

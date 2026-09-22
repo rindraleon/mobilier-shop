@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   Between,
@@ -35,6 +35,8 @@ export interface AuditEntry {
 
 @Injectable()
 export class AuditService {
+  private readonly logger = new Logger(AuditService.name);
+
   constructor(
     @InjectRepository(AuditLog)
     private readonly repo: Repository<AuditLog>,
@@ -58,8 +60,13 @@ export class AuditService {
       });
       await this.repo.save(log);
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.warn('[audit] écriture impossible :', (error as Error).message);
+      // Le journal d'audit ne doit jamais faire échouer l'action métier qui
+      // l'a déclenché : on trace via le Logger Nest (horodatage homogène,
+      // visible en supervision) et on poursuit.
+      this.logger.error(
+        `Écriture du journal d'audit impossible : ${(error as Error).message}`,
+        (error as Error).stack,
+      );
     }
   }
 

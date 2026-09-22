@@ -13,6 +13,7 @@ import { UsersService } from '../users/users.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from '../shared/mail/mail.service';
 import { QueueService } from '../shared/queue/queue.service';
+import { RedisService } from '../shared/redis/redis.service';
 import { ErrorCode } from '../common/errors/error-codes';
 import { UserRole } from '../common/enums';
 import type { User } from '../users/entities/user.entity';
@@ -34,6 +35,9 @@ const makeUser = async (overrides: Partial<User> = {}): Promise<User> =>
 
 describe('AuthService', () => {
   let service: AuthService;
+  let redis: { get: jest.Mock; set: jest.Mock; del: jest.Mock };
+  const redisStore = new Map<string, number>();
+
   let refreshTokens: {
     findOne: jest.Mock;
     save: jest.Mock;
@@ -77,6 +81,26 @@ describe('AuthService', () => {
       execute: jest.fn().mockResolvedValue({ affected: 1 }),
     };
 
+    // Faux Redis : compteur en mémoire, vidé avant chaque test pour qu'un
+    // verrouillage ne contamine pas les tests suivants.
+    redisStore.clear();
+    redis = {
+      get: jest.fn(async (key: string) =>
+        redisStore.has(key) ? (redisStore.get(key) as number) : null,
+      ),
+      set: jest.fn(async (key: string, value: number) => {
+        redisStore.set(key, value);
+        return true;
+      }),
+      del: jest.fn(async (...keys: string[]) => {
+        let supprimees = 0;
+        for (const key of keys) {
+          if (redisStore.delete(key)) supprimees += 1;
+        }
+        return supprimees;
+      }),
+    };
+
     refreshTokens = {
       findOne: jest.fn(),
       save: jest.fn().mockImplementation(async (entity: unknown) => entity),
@@ -106,6 +130,7 @@ describe('AuthService', () => {
         { provide: AuditService, useValue: audit },
         { provide: MailService, useValue: mail },
         { provide: QueueService, useValue: queue },
+        { provide: RedisService, useValue: redis },
         { provide: getRepositoryToken(RefreshToken), useValue: refreshTokens },
         {
           provide: getRepositoryToken(PasswordResetToken),
@@ -161,6 +186,77 @@ describe('AuthService', () => {
       await expect(service.login({ email: user.email, password: PASSWORD })).rejects.toMatchObject({
         status: HttpStatus.FORBIDDEN,
         code: ErrorCode.ACCOUNT_DISABLED,
+      });
+    });
+
+    describe('verrouillage de compte', () => {
+      const MAX = 5;
+
+      beforeEach(() => {
+        // Le seuil est lu dans l'environnement : on le fixe pour rendre le
+        // test indépendant de la configuration de la machine.
+        process.env.LOGIN_MAX_ATTEMPTS = String(MAX);
+      });
+
+      afterEach(() => {
+        delete process.env.LOGIN_MAX_ATTEMPTS;
+      });
+
+      it(`refuse le bon mot de passe après ${MAX} échecs (429 TOO_MANY_REQUESTS)`, async () => {
+        const user = await makeUser();
+        usersService.findByEmail.mockResolvedValue(user);
+
+        for (let tentative = 1; tentative <= MAX; tentative += 1) {
+          await expect(
+            service.login({ email: user.email, password: 'mauvais' }),
+          ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED });
+        }
+
+        // Le mot de passe est pourtant correct : le compte est verrouillé.
+        await expect(
+          service.login({ email: user.email, password: PASSWORD }),
+        ).rejects.toMatchObject({
+          status: HttpStatus.TOO_MANY_REQUESTS,
+          code: ErrorCode.TOO_MANY_REQUESTS,
+        });
+      });
+
+      it('remet le compteur à zéro après une connexion réussie', async () => {
+        const user = await makeUser();
+        usersService.findByEmail.mockResolvedValue(user);
+
+        // Deux erreurs de frappe, puis une réussite : l'utilisateur légitime
+        // ne doit pas rester sous la menace d'un verrouillage.
+        for (let tentative = 1; tentative <= MAX - 3; tentative += 1) {
+          await expect(
+            service.login({ email: user.email, password: 'mauvais' }),
+          ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED });
+        }
+
+        const result = await service.login({ email: user.email, password: PASSWORD });
+        expect(result.accessToken).toBe('access-token');
+
+        for (let tentative = 1; tentative <= MAX - 3; tentative += 1) {
+          await expect(
+            service.login({ email: user.email, password: 'mauvais' }),
+          ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED });
+        }
+      });
+
+      it('ne verrouille pas les autres comptes', async () => {
+        const victime = await makeUser();
+        const autre = await makeUser({ email: 'autre@example.local' });
+
+        usersService.findByEmail.mockResolvedValue(victime);
+        for (let tentative = 1; tentative <= MAX; tentative += 1) {
+          await expect(
+            service.login({ email: victime.email, password: 'mauvais' }),
+          ).rejects.toMatchObject({ status: HttpStatus.UNAUTHORIZED });
+        }
+
+        usersService.findByEmail.mockResolvedValue(autre);
+        const result = await service.login({ email: autre.email, password: PASSWORD });
+        expect(result.accessToken).toBe('access-token');
       });
     });
   });

@@ -19,14 +19,33 @@ import type { AuthResponseDto, AuthUserDto, LoginDto, RegisterDto } from './dto/
 import { MailService } from '../shared/mail/mail.service';
 import { QueueService } from '../shared/queue/queue.service';
 import { welcomeTemplate, passwordResetTemplate } from '../shared/mail/templates';
+import { RedisService } from '../shared/redis/redis.service';
 
 const REFRESH_TOKEN_BYTES = 48;
 const RESET_TOKEN_BYTES = 32;
 const RESET_TOKEN_TTL_MINUTES = 30;
 
+/**
+ * Verrouillage de compte (anti force brute).
+ *
+ * Le limiteur global de NestJS compte par **adresse IP** : il bloque un
+ * assaillant qui martèle depuis une machine, mais ni une attaque répartie sur
+ * plusieurs IP, ni le fait qu'un bureau entier partage la même IP sortante ne
+ * sont correctement traités. On ajoute donc un compteur **par compte**, qui
+ * protège le mot de passe lui-même, quelle que soit la provenance.
+ */
+const LOGIN_MAX_ATTEMPTS_DEFAULT = 5;
+const LOGIN_LOCK_TTL_SECONDS_DEFAULT = 15 * 60;
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+
+  /**
+   * Repli mémoire lorsque Redis est indisponible : la protection doit rester
+   * active même sans Redis, quitte à n'être valable que pour cette instance.
+   */
+  private readonly loginFailures = new Map<string, { count: number; expiresAt: number }>();
 
   constructor(
     private readonly usersService: UsersService,
@@ -36,6 +55,7 @@ export class AuthService {
     private readonly audit: AuditService,
     private readonly mail: MailService,
     private readonly queue: QueueService,
+    private readonly redis: RedisService,
     @InjectRepository(RefreshToken)
     private readonly refreshTokens: Repository<RefreshToken>,
     @InjectRepository(PasswordResetToken)
@@ -85,6 +105,44 @@ export class AuthService {
 
   /* --------------------------------- Login ---------------------------------- */
 
+  /**
+   * Clé du compteur d'échecs. L'e-mail est haché : on ne stocke jamais
+   * d'adresse en clair dans Redis.
+   */
+  private loginFailureKey(email: string): string {
+    const digest = crypto
+      .createHash('sha256')
+      .update(email.trim().toLowerCase())
+      .digest('hex');
+    return `auth:login-fail:${digest}`;
+  }
+
+  private async readLoginFailures(key: string): Promise<number> {
+    const stored = await this.redis.get<number>(key);
+    if (stored !== null) return Number(stored) || 0;
+
+    const memoire = this.loginFailures.get(key);
+    if (!memoire) return 0;
+    if (memoire.expiresAt < Date.now()) {
+      this.loginFailures.delete(key);
+      return 0;
+    }
+    return memoire.count;
+  }
+
+  private async writeLoginFailures(key: string, count: number, ttl: number): Promise<void> {
+    const ecrit = await this.redis.set(key, count, ttl);
+    if (!ecrit) {
+      // Redis indisponible : on ne désactive pas la protection pour autant.
+      this.loginFailures.set(key, { count, expiresAt: Date.now() + ttl * 1000 });
+    }
+  }
+
+  private async clearLoginFailures(key: string): Promise<void> {
+    await this.redis.del(key);
+    this.loginFailures.delete(key);
+  }
+
   async login(dto: LoginDto, request?: Request): Promise<AuthResponseDto> {
     const user = await this.usersService.findByEmail(dto.email, true);
 
@@ -102,6 +160,31 @@ export class AuthService {
       );
     }
 
+    // Verrouillage par compte : au-delà du seuil, on refuse même un mot de
+    // passe correct, quelle que soit l'IP d'origine.
+    const maxAttempts =
+      Number(process.env.LOGIN_MAX_ATTEMPTS ?? LOGIN_MAX_ATTEMPTS_DEFAULT) ||
+      LOGIN_MAX_ATTEMPTS_DEFAULT;
+    const lockTtl =
+      Number(process.env.LOGIN_LOCK_TTL ?? LOGIN_LOCK_TTL_SECONDS_DEFAULT) ||
+      LOGIN_LOCK_TTL_SECONDS_DEFAULT;
+    const echecsKey = this.loginFailureKey(dto.email);
+    const echecs = await this.readLoginFailures(echecsKey);
+
+    if (echecs >= maxAttempts) {
+      await this.audit.log({
+        userId: user.id,
+        action: AuditAction.USER_LOGIN_FAILED,
+        entity: AuditEntity.AUTH,
+        request,
+        metadata: { reason: 'too_many_attempts', attempts: echecs },
+      });
+      throw BusinessException.tooManyRequests(
+        `Trop de tentatives de connexion. Réessayez dans ${Math.ceil(lockTtl / 60)} minutes.`,
+        ErrorCode.TOO_MANY_REQUESTS,
+      );
+    }
+
     const passwordValid = await argon2.verify(user.passwordHash, dto.password).catch(() => false);
     if (!passwordValid) {
       await this.audit.log({
@@ -109,8 +192,9 @@ export class AuthService {
         action: AuditAction.USER_LOGIN_FAILED,
         entity: AuditEntity.AUTH,
         request,
-        metadata: { reason: 'bad_password' },
+        metadata: { reason: 'bad_password', attempts: echecs + 1 },
       });
+      await this.writeLoginFailures(echecsKey, echecs + 1, lockTtl);
       throw BusinessException.unauthorized(
         'Identifiants invalides.',
         ErrorCode.INVALID_CREDENTIALS,
@@ -120,6 +204,8 @@ export class AuthService {
     if (!user.isActive) {
       throw BusinessException.forbidden('Compte désactivé.', ErrorCode.ACCOUNT_DISABLED);
     }
+
+    await this.clearLoginFailures(echecsKey);
 
     await this.dataSource.getRepository(User).update({ id: user.id }, { lastLoginAt: new Date() });
 

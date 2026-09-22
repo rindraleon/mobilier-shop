@@ -1,102 +1,137 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronRight, Package } from "lucide-react";
-import { useStore } from "../../context/StoreContext";
+import { Package } from "lucide-react";
+import { useMyOrders } from "../../hooks/useOrders";
 import { ORDER_STATUS } from "../../utils/constants";
-import type { Order, OrderStatus } from "../../types";
 import { formatDate, formatPrice } from "../../utils/format";
 import EmptyState from "../../components/ui/EmptyState";
+import PageLoader from "../../components/ui/PageLoader";
+import Pagination from "../../components/ui/Pagination";
 import OrderStatusBadge from "../../components/ui/OrderStatusBadge";
 import { Select } from "../../components/ui/Form";
+import type { OrderStatus } from "../../types/api";
 
 export default function ClientOrders() {
-  const { user, orders } = useStore();
-  const [status, setStatus] = useState<string>("toutes");
+  const [page, setPage] = useState<number>(1);
+  const [status, setStatus] = useState<OrderStatus | "">("");
+  const { data, isLoading, isError, refetch, isPlaceholderData } = useMyOrders({
+    page,
+    limit: 10,
+    status: status || undefined,
+  });
 
-  const myOrders = useMemo<Order[] | null>(
-    () =>
-      user
-        ? orders
-            .filter((o) => o.userId === user.id && (status === "toutes" || o.status === status))
-            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        : null,
-    [orders, user, status]
-  );
-
-  if (!user || !myOrders) return null;
+  const orders = data?.items ?? [];
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-headline-lg text-primary">Mes commandes</h1>
-          <p className="mt-1 text-body-md text-on-surface-variant">Historique et suivi de vos achats.</p>
-        </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-headline-md text-primary">Mes commandes</h1>
         <Select
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="w-52"
+          onChange={(e) => {
+            setStatus(e.target.value as OrderStatus | "");
+            setPage(1);
+          }}
           aria-label="Filtrer par statut"
+          className="w-56"
         >
-          <option value="toutes">Toutes les commandes</option>
-          {(Object.keys(ORDER_STATUS) as OrderStatus[]).map((id) => (
-            <option key={id} value={id}>
-              {ORDER_STATUS[id].label}
+          <option value="">Tous les statuts</option>
+          {Object.entries(ORDER_STATUS).map(([value, meta]) => (
+            <option key={value} value={value}>
+              {meta.label}
             </option>
           ))}
         </Select>
       </div>
 
-      <div className="mt-6 space-y-4">
-        {myOrders.length === 0 ? (
+      {isLoading ? (
+        <div className="py-16">
+          <PageLoader label="Chargement des commandes…" />
+        </div>
+      ) : isError ? (
+        <div className="mt-6">
+          <EmptyState
+            title="Impossible de charger vos commandes"
+            actionLabel="Réessayer"
+            onAction={() => void refetch()}
+          />
+        </div>
+      ) : orders.length === 0 ? (
+        <div className="mt-6">
           <EmptyState
             icon={Package}
             title="Aucune commande"
-            text="Vous n'avez pas encore passé commande — ou aucune ne correspond à ce filtre."
+            text={
+              status
+                ? "Aucune commande ne correspond à ce statut."
+                : "Vous n'avez pas encore passé de commande."
+            }
             actionLabel="Découvrir la boutique"
             actionTo="/boutique"
           />
-        ) : (
-          myOrders.map((order) => (
-            <Link
-              key={order.id}
-              to={`/espace-client/commandes/${order.id}`}
-              className="card group flex flex-wrap items-center gap-4 p-5 transition-all hover:-translate-y-0.5 hover:shadow-card-hover sm:gap-6"
-            >
-              <div className="flex -space-x-3">
-                {order.items.slice(0, 3).map((item) => (
-                  <img
-                    key={item.productId}
-                    src={item.image}
-                    alt={item.name}
-                    className="h-16 w-14 rounded-md border-2 border-white object-cover"
-                  />
-                ))}
-                {order.items.length > 3 && (
-                  <span className="flex h-16 w-14 items-center justify-center rounded-md border-2 border-white bg-surface-container text-body-sm font-semibold text-on-surface-variant">
-                    +{order.items.length - 3}
-                  </span>
-                )}
-              </div>
+        </div>
+      ) : (
+        <>
+          <ul className={`mt-6 space-y-4 ${isPlaceholderData ? "opacity-60" : ""}`}>
+            {orders.map((order) => (
+              <li key={order.id} className="card p-4 sm:p-5">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Link
+                    to={"/espace-client/commandes/" + order.id}
+                    className="min-w-0 flex-1 truncate font-display text-headline-sm text-primary hover:text-secondary"
+                  >
+                    {order.orderNumber}
+                  </Link>
+                  <OrderStatusBadge status={order.status} />
+                  <span className="font-display text-lg text-primary">{formatPrice(order.total)}</span>
+                </div>
 
-              <div className="min-w-0 flex-1">
-                <p className="font-semibold text-primary group-hover:text-secondary">{order.id}</p>
-                <p className="text-body-sm text-on-surface-variant">
-                  {formatDate(order.createdAt)} · {order.items.reduce((s, it) => s + it.qty, 0)} article
-                  {order.items.reduce((s, it) => s + it.qty, 0) > 1 ? "s" : ""}
+                <p className="mt-1 text-label-sm text-on-surface-variant">
+                  {formatDate(order.createdAt)} · {order.items.reduce((s, i) => s + i.quantity, 0)}{" "}
+                  article(s)
                 </p>
-              </div>
 
-              <OrderStatusBadge status={order.status} />
-              <span className="font-display text-lg text-primary">{formatPrice(order.total)}</span>
-              <ChevronRight
-                size={18}
-                className="text-on-surface-variant transition-transform group-hover:translate-x-1"
-              />
-            </Link>
-          ))
-        )}
-      </div>
+                <ul className="mt-3 flex flex-wrap gap-2">
+                  {order.items.slice(0, 4).map((item) => (
+                    <li key={item.id} className="flex items-center gap-2 rounded-lg bg-surface-container-low p-1.5 pr-3">
+                      <span className="h-9 w-9 shrink-0 overflow-hidden rounded bg-surface-container">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+                        ) : null}
+                      </span>
+                      <span className="max-w-[10rem] truncate text-label-sm text-on-surface-variant">
+                        {item.name} × {item.quantity}
+                      </span>
+                    </li>
+                  ))}
+                  {order.items.length > 4 && (
+                    <li className="self-center text-label-sm text-on-surface-variant">
+                      +{order.items.length - 4} autre(s)
+                    </li>
+                  )}
+                </ul>
+
+                <Link
+                  to={"/espace-client/commandes/" + order.id}
+                  className="mt-3 inline-block text-body-sm font-semibold text-secondary underline-offset-2 hover:underline"
+                >
+                  Suivre cette commande →
+                </Link>
+              </li>
+            ))}
+          </ul>
+
+          {data?.meta && (
+            <Pagination
+              className="mt-6"
+              page={data.meta.page}
+              totalPages={data.meta.totalPages}
+              total={data.meta.total}
+              onPageChange={setPage}
+            />
+          )}
+        </>
+      )}
     </div>
   );
 }

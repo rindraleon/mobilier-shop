@@ -1,6 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
-import { ValidationPipe } from '@nestjs/common';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -10,6 +10,7 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { BusinessException } from './common/errors/business.exception';
 import { ErrorCode } from './common/errors/error-codes';
 import { StorageService } from './shared/storage/storage.service';
+import { DataSource } from 'typeorm';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, {
@@ -180,6 +181,8 @@ async function bootstrap(): Promise<void> {
   const storage = app.get(StorageService);
   await storage.ensureBuckets().catch(() => undefined);
 
+  await warnIfSchemaMissing(app);
+
   const port = config.get<number>('port') ?? 3000;
   await app.listen(port, '0.0.0.0');
 
@@ -194,6 +197,42 @@ async function bootstrap(): Promise<void> {
       '',
     ].join('\n'),
   );
+}
+
+/**
+ * Schéma absent : le dire au démarrage plutôt qu'en 500.
+ *
+ * Sans ce contrôle, un développeur qui clone le projet et lance l'API sans
+ * exécuter les migrations obtient, sur la première requête, une erreur
+ * incompréhensible (`relation « users » does not exist`) qui ne mentionne ni
+ * la migration ni la commande à lancer. On la détecte ici et on l'annonce
+ * explicitement.
+ */
+async function warnIfSchemaMissing(app: INestApplication): Promise<void> {
+  try {
+    const dataSource = app.get(DataSource, { strict: false });
+    const rows = await dataSource.query<Array<{ present: boolean }>>(
+      "SELECT to_regclass('public.users') IS NOT NULL AS present",
+    );
+    if (rows?.[0]?.present) return;
+
+    new Logger('Database').error(
+      [
+        '',
+        '  ⚠  Le schéma de base de données est absent : aucune table créée.',
+        "     L'API démarrera mais toutes les requêtes échoueront en 500.",
+        '',
+        '     Corrigez-le avec :',
+        '       npm run migration:run    (crée le schéma)',
+        '       npm run seed             (jeu de données de démonstration)',
+        '',
+        '     ou, en une seule commande :  npm run db:setup',
+        '',
+      ].join('\n'),
+    );
+  } catch {
+    /* Base injoignable : /health et les logs TypeORM le signalent déjà. */
+  }
 }
 
 void bootstrap();

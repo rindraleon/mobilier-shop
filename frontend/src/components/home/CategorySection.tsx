@@ -1,38 +1,55 @@
 import { Link } from "react-router-dom";
-import { categories } from "../../data/products";
+import { useCategories } from "../../hooks/useCatalog";
 import SectionHeading from "../ui/SectionHeading";
 import Reveal from "../ui/Reveal";
-import Button from "../ui/Button";
 
+/** Catégories récupérées depuis l'API (plus aucune liste en dur). */
 export default function CategorySection() {
+  const { data: categories = [], isLoading } = useCategories();
+  const visible = categories.slice(0, 6);
+
+  if (isLoading || visible.length === 0) return null;
+
   return (
-    <section className="container-app section">
-      <SectionHeading
-        eyebrow="Univers"
-        title="Parcourir par catégorie"
-        subtitle="Six univers complémentaires pour meubler toute votre maison avec cohérence."
-        action={
-          <Button as={Link} to="/boutique" variant="outline">
-            Tous les produits
-          </Button>
-        }
-      />
-      <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 md:gap-6 lg:grid-cols-6">
-        {categories.map((cat, i) => (
-          <Reveal key={cat.id} delay={i * 0.07}>
-            <Link to={`/boutique?categorie=${cat.id}`} className="group flex flex-col items-center text-center">
-              <div className="mb-3 aspect-square w-full max-w-[150px] overflow-hidden rounded-full bg-surface-container shadow-card transition-shadow duration-300 group-hover:shadow-card-hover">
-                <img
-                  src={cat.image}
-                  alt={cat.name}
-                  loading="lazy"
-                  className="h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-110"
-                />
-              </div>
-              <span className="text-label-md text-primary transition-colors group-hover:text-secondary">{cat.name}</span>
-            </Link>
-          </Reveal>
-        ))}
+    <section className="section bg-surface-container-low/60">
+      <div className="container-app">
+        <SectionHeading
+          eyebrow="Par univers"
+          title="Trouvez le meuble qui vous ressemble"
+          subtitle="Six familles de mobilier, sélectionnées auprès d'artisans et de boutiques malgaches."
+          center
+        />
+        <div className="mt-10 grid grid-cols-2 gap-4 md:grid-cols-3">
+          {visible.map((category, i) => (
+            <Reveal key={category.id} delay={i * 0.06}>
+              <Link
+                to={"/boutique?categorie=" + category.slug}
+                className="product-card card group block overflow-hidden"
+              >
+                <span className="block aspect-[4/3] overflow-hidden bg-surface-container">
+                  {category.imageUrl ? (
+                    <img
+                      src={category.imageUrl}
+                      alt={category.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                  ) : null}
+                </span>
+                <span className="block p-4">
+                  <span className="font-display text-headline-sm text-primary group-hover:text-secondary">
+                    {category.name}
+                  </span>
+                  {category.description && (
+                    <span className="mt-1 block text-body-sm text-on-surface-variant">
+                      {category.description}
+                    </span>
+                  )}
+                </span>
+              </Link>
+            </Reveal>
+          ))}
+        </div>
       </div>
     </section>
   );

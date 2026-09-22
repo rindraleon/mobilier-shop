@@ -1,248 +1,268 @@
 import { useState } from "react";
-import type { FormEvent } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Eye, EyeOff, Lock, LogIn, Mail, User, UserPlus } from "lucide-react";
-import { useStore } from "../../context/StoreContext";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Check, Eye, EyeOff, Lock, Mail, Store } from "lucide-react";
+import { useAuth } from "../../lib/auth/AuthProvider";
 import { useToast } from "../../context/ToastContext";
+import { loginSchema, registerSchema } from "../../schemas/auth";
+import type { LoginInput, RegisterFormInput } from "../../schemas/auth";
+import { errorMessage } from "../../utils/errors";
+import Breadcrumbs from "../../components/ui/Breadcrumbs";
 import Button from "../../components/ui/Button";
 import { Field, Input } from "../../components/ui/Form";
 
-interface DemoAccount {
-  label: string;
-  email: string;
-  password: string;
-}
+type Tab = "login" | "register";
 
-const demoAccounts: DemoAccount[] = [
-  { label: "Client démo", email: "client@anti.fr", password: "client123" },
-  { label: "Admin démo", email: "admin@anti.fr", password: "admin123" },
-];
-
-interface LoginForm {
-  name: string;
-  email: string;
-  password: string;
-  confirm: string;
-}
-
-interface LoginErrors {
-  name?: string;
-  email?: string;
-  password?: string;
-  confirm?: string;
-  global?: string;
+interface LocationState {
+  from?: string;
 }
 
 export default function Login() {
-  const { login, register } = useStore();
+  const [tab, setTab] = useState<Tab>("login");
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const { login, register } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string } | null)?.from;
+  const from = (location.state as LocationState | null)?.from ?? "/espace-client";
 
-  const [mode, setMode] = useState<"login" | "register">("login");
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [form, setForm] = useState<LoginForm>({ name: "", email: "", password: "", confirm: "" });
-  const [errors, setErrors] = useState<LoginErrors>({});
+  const loginForm = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: "", password: "" },
+  });
 
-  const set = (key: keyof LoginForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
+  const registerForm = useForm<RegisterFormInput>({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      password: "",
+      confirmPassword: "",
+      asSeller: false,
+    },
+  });
 
-  const afterAuth = (name: string, role: string) => {
-    toast(`Bienvenue, ${name.split(" ")[0]} !`);
-    const fallback = role === "admin" ? "/admin" : "/espace-client";
-    navigate(from ?? fallback, { replace: true });
-  };
-
-  const submit = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const errs: LoginErrors = {};
-    if (mode === "register" && !form.name.trim()) errs.name = "Votre nom est requis.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Adresse email invalide.";
-    if (form.password.length < 6) errs.password = "Le mot de passe doit contenir au moins 6 caractères.";
-    if (mode === "register" && form.confirm !== form.password) {
-      errs.confirm = "Les mots de passe ne correspondent pas.";
+  const onLogin = loginForm.handleSubmit(async (values) => {
+    try {
+      const user = await login(values.email, values.password);
+      toast("Bonjour " + user.firstName + ", vous êtes connecté.");
+      navigate(user.role === "admin" ? "/admin" : from, { replace: true });
+    } catch (error) {
+      toast(errorMessage(error), "error");
     }
-    setErrors(errs);
-    if (Object.keys(errs).length) return;
+  });
 
-    const result = mode === "login" ? login(form.email, form.password) : register(form);
-    if (!result.ok) {
-      setErrors({ global: result.error });
-      return;
+  const onRegister = registerForm.handleSubmit(async (values) => {
+    try {
+      const user = await register({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        phone: values.phone || undefined,
+        password: values.password,
+        asSeller: values.asSeller,
+      });
+      toast(
+        values.asSeller
+          ? "Compte créé. Votre demande vendeur est en cours de validation."
+          : "Compte créé. Bienvenue !",
+      );
+      navigate(user.role === "admin" ? "/admin" : from, { replace: true });
+    } catch (error) {
+      toast(errorMessage(error), "error");
     }
-    afterAuth(result.user!.name, result.user!.role);
-  };
+  });
+
+  const busy = loginForm.formState.isSubmitting || registerForm.formState.isSubmitting;
 
   return (
-    <div className="grid min-h-[70vh] lg:grid-cols-2">
-      {/* Visuel */}
-      <div className="relative hidden overflow-hidden lg:block">
-        <img
-          src="/images/hero.jpg"
-          alt="Intérieur signé Anti"
-          className="absolute inset-0 h-full w-full object-cover"
-        />
-        <div className="absolute inset-0 bg-primary/70" />
-        <div className="relative flex h-full flex-col justify-end p-12 text-on-primary">
-          <p className="text-label-md uppercase tracking-[0.2em] text-secondary-fixed-dim">Anti</p>
-          <h2 className="mt-3 max-w-md font-display text-display-md">
-            Votre intérieur mérite le meilleur du mobilier.
-          </h2>
-          <p className="mt-4 max-w-md text-body-lg text-primary-fixed-dim">
-            Rejoignez plus de 12 000 clients : suivi de commandes, favoris, adresses enregistrées et offres
-            exclusives.
-          </p>
-        </div>
-      </div>
+    <div className="container-app py-8 lg:py-12">
+      <Breadcrumbs items={[{ label: "Accueil", to: "/" }, { label: "Connexion" }]} />
 
-      {/* Formulaire */}
-      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
-        <div className="w-full max-w-md">
-          <div className="mb-8 text-center">
-            <Link to="/" className="font-display text-3xl font-bold text-primary">
-              Anti
-            </Link>
-            <h1 className="mt-4 font-display text-headline-lg text-primary">
-              {mode === "login" ? "Content de vous revoir" : "Créer un compte"}
-            </h1>
-            <p className="mt-2 text-body-md text-on-surface-variant">
-              {mode === "login"
-                ? "Connectez-vous pour accéder à votre espace."
-                : "Quelques secondes suffisent pour commander plus vite."}
-            </p>
+      <div className="mx-auto mt-8 max-w-lg">
+        <div className="card p-6 sm:p-8">
+          <div className="grid grid-cols-2 gap-1 rounded-lg bg-surface-container p-1">
+            <button
+              onClick={() => setTab("login")}
+              aria-pressed={tab === "login"}
+              className={`rounded-md px-4 py-2.5 text-body-sm font-semibold transition-colors ${
+                tab === "login" ? "bg-white text-primary shadow-card" : "text-on-surface-variant"
+              }`}
+            >
+              Connexion
+            </button>
+            <button
+              onClick={() => setTab("register")}
+              aria-pressed={tab === "register"}
+              className={`rounded-md px-4 py-2.5 text-body-sm font-semibold transition-colors ${
+                tab === "register" ? "bg-white text-primary shadow-card" : "text-on-surface-variant"
+              }`}
+            >
+              Créer un compte
+            </button>
           </div>
 
-          {/* Onglets */}
-          <div className="mb-6 grid grid-cols-2 gap-1 rounded-lg bg-surface-container p-1">
-            {(
-              [
-                { id: "login", label: "Connexion" },
-                { id: "register", label: "Inscription" },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setMode(tab.id);
-                  setErrors({});
-                }}
-                className={`rounded-md py-2.5 text-body-sm font-semibold transition-colors ${
-                  mode === tab.id ? "bg-white text-primary shadow-card" : "text-on-surface-variant hover:text-primary"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {errors.global && (
-            <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-body-sm text-red-700">
-              {errors.global}
-            </p>
-          )}
-
-          <form onSubmit={submit} className="space-y-4" noValidate>
-            {mode === "register" && (
-              <Field label="Nom complet" required error={errors.name}>
-                <div className="relative">
-                  <User size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/60" />
-                  <Input
-                    value={form.name}
-                    onChange={set("name")}
-                    placeholder="Camille Moreau"
-                    className="pl-10"
-                    autoComplete="name"
-                  />
-                </div>
-              </Field>
-            )}
-
-            <Field label="Email" required error={errors.email}>
-              <div className="relative">
-                <Mail size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/60" />
+          {tab === "login" ? (
+            <form onSubmit={onLogin} className="mt-6 space-y-4" noValidate>
+              <Field label="Adresse e-mail" required error={loginForm.formState.errors.email?.message}>
                 <Input
                   type="email"
-                  value={form.email}
-                  onChange={set("email")}
-                  placeholder="vous@exemple.fr"
-                  className="pl-10"
                   autoComplete="email"
+                  placeholder="vous@exemple.mg"
+                  {...loginForm.register("email")}
                 />
-              </div>
-            </Field>
+              </Field>
 
-            <Field label="Mot de passe" required error={errors.password}>
-              <div className="relative">
-                <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/60" />
-                <Input
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={set("password")}
-                  placeholder="••••••••"
-                  className="pl-10 pr-11"
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword((v) => !v)}
-                  aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary"
-                >
-                  {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
-                </button>
-              </div>
-            </Field>
-
-            {mode === "register" && (
-              <Field label="Confirmer le mot de passe" required error={errors.confirm}>
-                <div className="relative">
-                  <Lock size={17} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-on-surface-variant/60" />
+              <Field
+                label="Mot de passe"
+                required
+                error={loginForm.formState.errors.password?.message}
+              >
+                <span className="relative block">
                   <Input
                     type={showPassword ? "text" : "password"}
-                    value={form.confirm}
-                    onChange={set("confirm")}
+                    autoComplete="current-password"
                     placeholder="••••••••"
-                    className="pl-10"
-                    autoComplete="new-password"
+                    className="pr-11"
+                    {...loginForm.register("password")}
                   />
-                </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? "Masquer le mot de passe" : "Afficher le mot de passe"}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant hover:text-primary"
+                  >
+                    {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
+                  </button>
+                </span>
               </Field>
-            )}
 
-            <Button type="submit" variant="accent" size="lg" className="w-full">
-              {mode === "login" ? (
-                <>
-                  <LogIn size={17} /> Se connecter
-                </>
-              ) : (
-                <>
-                  <UserPlus size={17} /> Créer mon compte
-                </>
-              )}
-            </Button>
-          </form>
-
-          {/* Comptes de démo */}
-          <div className="mt-8 rounded-lg border border-dashed border-secondary/40 bg-secondary-container/25 p-4">
-            <p className="text-label-md text-on-secondary-container">Comptes de démonstration</p>
-            <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              {demoAccounts.map((acc) => (
-                <button
-                  key={acc.email}
-                  onClick={() => {
-                    setMode("login");
-                    setForm({ name: "", email: acc.email, password: acc.password, confirm: "" });
-                    setErrors({});
-                  }}
-                  className="rounded-lg border border-outline-variant/60 bg-white px-3 py-2.5 text-left text-body-sm transition-colors hover:border-secondary"
+              <div className="flex justify-end">
+                <Link
+                  to="/mot-de-passe-oublie"
+                  className="text-body-sm text-secondary underline-offset-2 hover:underline"
                 >
-                  <span className="block font-semibold text-primary">{acc.label}</span>
-                  <span className="block truncate text-on-surface-variant">{acc.email}</span>
-                </button>
-              ))}
-            </div>
-          </div>
+                  Mot de passe oublié ?
+                </Link>
+              </div>
+
+              <Button type="submit" className="w-full" size="lg" disabled={busy}>
+                <Lock size={16} /> {busy ? "Connexion…" : "Se connecter"}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={onRegister} className="mt-6 space-y-4" noValidate>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Prénom" required error={registerForm.formState.errors.firstName?.message}>
+                  <Input autoComplete="given-name" {...registerForm.register("firstName")} />
+                </Field>
+                <Field label="Nom" required error={registerForm.formState.errors.lastName?.message}>
+                  <Input autoComplete="family-name" {...registerForm.register("lastName")} />
+                </Field>
+              </div>
+
+              <Field label="Adresse e-mail" required error={registerForm.formState.errors.email?.message}>
+                <Input
+                  type="email"
+                  autoComplete="email"
+                  placeholder="vous@exemple.mg"
+                  {...registerForm.register("email")}
+                />
+              </Field>
+
+              <Field label="Téléphone" error={registerForm.formState.errors.phone?.message}>
+                <Input
+                  autoComplete="tel"
+                  placeholder="+261 34 12 345 67"
+                  {...registerForm.register("phone")}
+                />
+              </Field>
+
+              <Field
+                label="Mot de passe"
+                required
+                hint="Au moins 8 caractères, dont une lettre et un chiffre."
+                error={registerForm.formState.errors.password?.message}
+              >
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  className="pr-11"
+                  {...registerForm.register("password")}
+                />
+              </Field>
+
+              <Field
+                label="Confirmer le mot de passe"
+                required
+                error={registerForm.formState.errors.confirmPassword?.message}
+              >
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="new-password"
+                  {...registerForm.register("confirmPassword")}
+                />
+              </Field>
+
+              <button
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                className="text-body-sm text-secondary underline-offset-2 hover:underline"
+              >
+                {showPassword ? "Masquer" : "Afficher"} les mots de passe
+              </button>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-outline-variant/60 bg-surface-container-low p-3.5">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 rounded accent-secondary"
+                  {...registerForm.register("asSeller")}
+                />
+                <span className="text-body-sm text-on-surface-variant">
+                  <span className="flex items-center gap-1.5 font-semibold text-primary">
+                    <Store size={15} /> Je veux vendre mes meubles
+                  </span>
+                  Une demande vendeur sera créée. Un administrateur doit la valider avant toute
+                  publication (aucune vente possible avant approbation).
+                </span>
+              </label>
+
+              <Button type="submit" className="w-full" size="lg" disabled={busy}>
+                <Check size={16} /> {busy ? "Création…" : "Créer mon compte"}
+              </Button>
+            </form>
+          )}
+
+          <p className="mt-6 flex items-center justify-center gap-2 text-label-sm text-on-surface-variant">
+            <Mail size={13} /> Vos données sont traitées par notre API sécurisée.
+          </p>
+        </div>
+
+        {/* Comptes de démonstration — utiles pour évaluer le projet. */}
+        <div className="card mt-5 p-5">
+          <p className="text-label-md uppercase tracking-wider text-on-surface-variant">
+            Comptes de démonstration
+          </p>
+          <ul className="mt-3 space-y-1.5 text-body-sm text-on-surface-variant">
+            <li>
+              <strong className="text-primary">Admin</strong> — admin@example.local
+            </li>
+            <li>
+              <strong className="text-primary">Vendeur approuvé</strong> — seller@example.local
+            </li>
+            <li>
+              <strong className="text-primary">Vendeur en attente</strong> — pending@example.local
+            </li>
+            <li>
+              <strong className="text-primary">Client</strong> — customer@example.local
+            </li>
+          </ul>
+          <p className="mt-3 text-label-sm text-on-surface-variant">
+            Mot de passe commun : <code className="text-primary">Motdepasse1!</code>
+          </p>
         </div>
       </div>
     </div>

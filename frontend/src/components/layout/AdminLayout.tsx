@@ -1,25 +1,52 @@
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
-import { ArrowLeft, ClipboardList, LayoutDashboard, LogOut, Sofa, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  BarChart3,
+  ClipboardList,
+  ClipboardCheck,
+  LayoutDashboard,
+  LogOut,
+  Sofa,
+  Store,
+  Tags,
+  Users,
+  Wallet,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useStore } from "../../context/StoreContext";
+import { useAuth } from "../../lib/auth/AuthProvider";
+import { usePendingSellers } from "../../hooks/useAdmin";
 
 interface AdminNavItem {
   to: string;
   icon: LucideIcon;
   label: string;
   end?: boolean;
+  badge?: number;
 }
 
+/** Navigation complète de l'espace administrateur (§15). */
 const navItems: AdminNavItem[] = [
   { to: "/admin", icon: LayoutDashboard, label: "Tableau de bord", end: true },
+  { to: "/admin/vendeurs", icon: Store, label: "Vendeurs" },
   { to: "/admin/produits", icon: Sofa, label: "Produits" },
   { to: "/admin/commandes", icon: ClipboardList, label: "Commandes" },
+  { to: "/admin/paiements", icon: Wallet, label: "Paiements" },
   { to: "/admin/clients", icon: Users, label: "Clients" },
+  { to: "/admin/categories", icon: Tags, label: "Catégories" },
+  { to: "/admin/statistiques", icon: BarChart3, label: "Statistiques" },
+  { to: "/admin/journal", icon: ClipboardCheck, label: "Journal d'audit" },
 ];
 
 export default function AdminLayout() {
-  const { logout } = useStore();
+  const { logout } = useAuth();
   const navigate = useNavigate();
+  // Les demandes en attente sont signalées directement dans la barre latérale.
+  const { data: pending } = usePendingSellers();
+  const pendingCount = pending?.length ?? 0;
+
+  const items = navItems.map((item) =>
+    item.to === "/admin/vendeurs" ? { ...item, badge: pendingCount } : item,
+  );
 
   return (
     <div className="min-h-screen bg-surface-container-low/60">
@@ -28,16 +55,16 @@ export default function AdminLayout() {
         <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col bg-primary p-5 text-on-primary lg:flex">
           <Link to="/admin" className="mb-8 flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary-fixed-dim font-display text-lg font-bold text-primary">
-              A
+              M
             </span>
             <div>
-              <p className="font-display text-lg font-bold leading-tight">Anti</p>
+              <p className="font-display text-lg font-bold leading-tight">Mobilier</p>
               <p className="text-label-sm text-primary-fixed-dim">Administration</p>
             </div>
           </Link>
 
-          <nav className="flex flex-1 flex-col gap-1" aria-label="Navigation admin">
-            {navItems.map(({ to, icon: Icon, label, end }) => (
+          <nav className="thin-scroll flex flex-1 flex-col gap-1 overflow-y-auto" aria-label="Navigation admin">
+            {items.map(({ to, icon: Icon, label, end, badge }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -50,7 +77,13 @@ export default function AdminLayout() {
                   }`
                 }
               >
-                <Icon size={18} /> {label}
+                <Icon size={18} />
+                <span className="flex-1 truncate">{label}</span>
+                {badge ? (
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-secondary px-1.5 text-[10px] font-bold text-on-secondary">
+                    {badge}
+                  </span>
+                ) : null}
               </NavLink>
             ))}
           </nav>
@@ -64,7 +97,7 @@ export default function AdminLayout() {
             </Link>
             <button
               onClick={() => {
-                logout();
+                void logout();
                 navigate("/");
               }}
               className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-left text-body-sm font-medium text-primary-fixed-dim transition-colors hover:bg-red-500/20 hover:text-white"
@@ -80,21 +113,17 @@ export default function AdminLayout() {
             <div className="flex items-center justify-between">
               <Link to="/admin" className="flex items-center gap-2">
                 <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary-fixed-dim font-display text-base font-bold text-primary">
-                  A
+                  M
                 </span>
-                <p className="font-display text-lg font-bold">Anti · Admin</p>
+                <p className="font-display text-lg font-bold">Admin</p>
               </Link>
               <div className="flex items-center gap-1">
-                <Link
-                  to="/"
-                  aria-label="Voir la boutique"
-                  className="rounded-lg p-2 text-primary-fixed-dim hover:text-white"
-                >
+                <Link to="/" aria-label="Voir la boutique" className="rounded-lg p-2 text-primary-fixed-dim hover:text-white">
                   <ArrowLeft size={19} />
                 </Link>
                 <button
                   onClick={() => {
-                    logout();
+                    void logout();
                     navigate("/");
                   }}
                   aria-label="Se déconnecter"
@@ -108,7 +137,7 @@ export default function AdminLayout() {
               className="no-scrollbar -mx-1 mt-3 flex gap-1 overflow-x-auto pb-1"
               aria-label="Navigation admin mobile"
             >
-              {navItems.map(({ to, icon: Icon, label, end }) => (
+              {items.map(({ to, icon: Icon, label, end, badge }) => (
                 <NavLink
                   key={to}
                   to={to}
@@ -120,6 +149,7 @@ export default function AdminLayout() {
                   }
                 >
                   <Icon size={16} /> {label}
+                  {badge ? <span className="text-[10px] font-bold">({badge})</span> : null}
                 </NavLink>
               ))}
             </nav>

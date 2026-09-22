@@ -1,155 +1,164 @@
-import { useState } from "react";
-import type { FormEvent } from "react";
-import { KeyRound, Save, User } from "lucide-react";
-import { useStore } from "../../context/StoreContext";
-import { useToast } from "../../context/ToastContext";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { KeyRound, User } from "lucide-react";
+import { useCurrentUser, useChangePassword, useUpdateProfile } from "../../hooks/useAccount";
+import { changePasswordSchema, profileSchema } from "../../schemas/auth";
+import type { ChangePasswordFormInput, ProfileFormInput } from "../../schemas/auth";
 import { formatDate } from "../../utils/format";
+import { errorMessage } from "../../utils/errors";
+import { useToast } from "../../context/ToastContext";
 import Button from "../../components/ui/Button";
 import { Field, Input } from "../../components/ui/Form";
+import PageLoader from "../../components/ui/PageLoader";
+import Badge from "../../components/ui/Badge";
 import Avatar from "../../components/ui/Avatar";
 
-interface InfoForm {
-  name: string;
-  email: string;
-}
-
-interface InfoErrors {
-  name?: string;
-  email?: string;
-}
-
-interface PasswordForm {
-  current: string;
-  next: string;
-  confirm: string;
-}
-
-interface PasswordErrors {
-  current?: string;
-  next?: string;
-  confirm?: string;
-}
+const ROLE_LABEL: Record<string, string> = {
+  customer: "Client",
+  seller: "Vendeur",
+  admin: "Administrateur",
+};
 
 export default function ClientProfile() {
-  const { user, updateProfile, changePassword } = useStore();
   const { toast } = useToast();
+  const { data: profile, isLoading } = useCurrentUser();
+  const updateProfile = useUpdateProfile();
+  const changePassword = useChangePassword();
 
-  const [info, setInfo] = useState<InfoForm>({ name: user?.name ?? "", email: user?.email ?? "" });
-  const [infoErrors, setInfoErrors] = useState<InfoErrors>({});
+  const profileForm = useForm<ProfileFormInput>({
+    resolver: zodResolver(profileSchema),
+    values: profile
+      ? {
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          email: profile.email,
+          phone: profile.phone ?? "",
+        }
+      : undefined,
+  });
 
-  const [pwd, setPwd] = useState<PasswordForm>({ current: "", next: "", confirm: "" });
-  const [pwdErrors, setPwdErrors] = useState<PasswordErrors>({});
+  const passwordForm = useForm<ChangePasswordFormInput>({
+    resolver: zodResolver(changePasswordSchema),
+    defaultValues: { currentPassword: "", newPassword: "", confirmPassword: "" },
+  });
 
-  if (!user) return null;
+  if (isLoading || !profile) {
+    return (
+      <div className="py-16">
+        <PageLoader label="Chargement du profil…" />
+      </div>
+    );
+  }
 
-  const submitInfo = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const errs: InfoErrors = {};
-    if (!info.name.trim()) errs.name = "Le nom est requis.";
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(info.email)) errs.email = "Adresse email invalide.";
-    setInfoErrors(errs);
-    if (Object.keys(errs).length) return;
-    const result = updateProfile(user.id, info);
-    if (!result.ok) {
-      setInfoErrors({ email: result.error });
-      return;
+  const onProfileSubmit = profileForm.handleSubmit(async (values) => {
+    try {
+      await updateProfile.mutateAsync({
+        firstName: values.firstName,
+        lastName: values.lastName,
+        email: values.email,
+        phone: values.phone || undefined,
+      });
+    } catch (error) {
+      toast(errorMessage(error), "error");
     }
-    toast("Vos informations ont été mises à jour.");
-  };
+  });
 
-  const submitPassword = (e: FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const errs: PasswordErrors = {};
-    if (pwd.next.length < 6) errs.next = "Au moins 6 caractères.";
-    if (pwd.confirm !== pwd.next) errs.confirm = "Les mots de passe ne correspondent pas.";
-    setPwdErrors(errs);
-    if (Object.keys(errs).length) return;
-    const result = changePassword(user.id, pwd.current, pwd.next);
-    if (!result.ok) {
-      setPwdErrors({ current: result.error });
-      return;
+  const onPasswordSubmit = passwordForm.handleSubmit(async (values) => {
+    try {
+      await changePassword.mutateAsync({
+        currentPassword: values.currentPassword,
+        newPassword: values.newPassword,
+      });
+      passwordForm.reset();
+    } catch (error) {
+      toast(errorMessage(error), "error");
     }
-    setPwd({ current: "", next: "", confirm: "" });
-    toast("Votre mot de passe a été modifié.");
-  };
+  });
 
   return (
     <div>
-      <h1 className="font-display text-headline-lg text-primary">Mon profil</h1>
-      <p className="mt-1 text-body-md text-on-surface-variant">Gérez vos informations personnelles.</p>
+      <h1 className="font-display text-headline-md text-primary">Mon profil</h1>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        {/* Informations */}
-        <form onSubmit={submitInfo} className="card p-6" noValidate>
-          <div className="flex items-center gap-4 border-b border-surface-container-highest pb-5">
-            <Avatar name={info.name} size="lg" />
-            <div>
-              <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
-                <User size={18} className="text-secondary" /> Informations
-              </h2>
-              <p className="text-label-sm text-on-surface-variant">Membre depuis le {formatDate(user.createdAt)}</p>
-            </div>
+      <section className="card mt-6 p-5 sm:p-6">
+        <div className="flex items-center gap-4">
+          <Avatar name={profile.fullName} size="lg" />
+          <div className="min-w-0">
+            <p className="truncate font-display text-headline-sm text-primary">{profile.fullName}</p>
+            <p className="truncate text-body-sm text-on-surface-variant">{profile.email}</p>
           </div>
-          <div className="mt-5 space-y-4">
-            <Field label="Nom complet" required error={infoErrors.name}>
-              <Input value={info.name} onChange={(e) => setInfo((f) => ({ ...f, name: e.target.value }))} />
-            </Field>
-            <Field label="Email" required error={infoErrors.email}>
-              <Input
-                type="email"
-                value={info.email}
-                onChange={(e) => setInfo((f) => ({ ...f, email: e.target.value }))}
-              />
-            </Field>
+          <div className="ml-auto flex flex-col items-end gap-1.5">
+            <Badge variant="secondary">{ROLE_LABEL[profile.role] ?? profile.role}</Badge>
+            <span className="text-label-sm text-on-surface-variant">
+              Membre depuis {formatDate(profile.createdAt, { month: "long", year: "numeric" })}
+            </span>
           </div>
-          <div className="mt-6 flex justify-end">
-            <Button type="submit" variant="accent">
-              <Save size={16} /> Enregistrer
+        </div>
+      </section>
+
+      <section className="card mt-6 p-5 sm:p-6">
+        <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
+          <User size={18} className="text-secondary" /> Informations personnelles
+        </h2>
+
+        <form onSubmit={onProfileSubmit} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
+          <Field label="Prénom" required error={profileForm.formState.errors.firstName?.message}>
+            <Input {...profileForm.register("firstName")} />
+          </Field>
+          <Field label="Nom" required error={profileForm.formState.errors.lastName?.message}>
+            <Input {...profileForm.register("lastName")} />
+          </Field>
+          <Field label="Adresse e-mail" required error={profileForm.formState.errors.email?.message}>
+            <Input type="email" {...profileForm.register("email")} />
+          </Field>
+          <Field label="Téléphone" error={profileForm.formState.errors.phone?.message}>
+            <Input placeholder="+261 34 12 345 67" {...profileForm.register("phone")} />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Button type="submit" disabled={updateProfile.isPending}>
+              {updateProfile.isPending ? "Enregistrement…" : "Enregistrer"}
             </Button>
           </div>
         </form>
+      </section>
 
-        {/* Mot de passe */}
-        <form onSubmit={submitPassword} className="card h-fit p-6" noValidate>
-          <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
-            <KeyRound size={18} className="text-secondary" /> Mot de passe
-          </h2>
-          <div className="mt-5 space-y-4">
-            <Field label="Mot de passe actuel" required error={pwdErrors.current}>
-              <Input
-                type="password"
-                value={pwd.current}
-                onChange={(e) => setPwd((p) => ({ ...p, current: e.target.value }))}
-                placeholder="••••••••"
-                autoComplete="current-password"
-              />
-            </Field>
-            <Field label="Nouveau mot de passe" required error={pwdErrors.next}>
-              <Input
-                type="password"
-                value={pwd.next}
-                onChange={(e) => setPwd((p) => ({ ...p, next: e.target.value }))}
-                placeholder="••••••••"
-                autoComplete="new-password"
-              />
-            </Field>
-            <Field label="Confirmer" required error={pwdErrors.confirm}>
-              <Input
-                type="password"
-                value={pwd.confirm}
-                onChange={(e) => setPwd((p) => ({ ...p, confirm: e.target.value }))}
-                placeholder="••••••••"
-                autoComplete="new-password"
-              />
-            </Field>
-          </div>
-          <div className="mt-6 flex justify-end">
-            <Button type="submit" variant="outline">
-              Modifier le mot de passe
+      <section className="card mt-6 p-5 sm:p-6">
+        <h2 className="flex items-center gap-2 font-display text-headline-sm text-primary">
+          <KeyRound size={18} className="text-secondary" /> Changer de mot de passe
+        </h2>
+
+        <form onSubmit={onPasswordSubmit} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
+          <Field
+            label="Mot de passe actuel"
+            required
+            error={passwordForm.formState.errors.currentPassword?.message}
+            className="sm:col-span-2"
+          >
+            <Input type="password" autoComplete="current-password" {...passwordForm.register("currentPassword")} />
+          </Field>
+          <Field
+            label="Nouveau mot de passe"
+            required
+            hint="Au moins 10 caractères, dont une lettre et un chiffre."
+            error={passwordForm.formState.errors.newPassword?.message}
+          >
+            <Input type="password" autoComplete="new-password" {...passwordForm.register("newPassword")} />
+          </Field>
+          <Field
+            label="Confirmer"
+            required
+            error={passwordForm.formState.errors.confirmPassword?.message}
+          >
+            <Input type="password" autoComplete="new-password" {...passwordForm.register("confirmPassword")} />
+          </Field>
+
+          <div className="sm:col-span-2">
+            <Button type="submit" disabled={changePassword.isPending}>
+              {changePassword.isPending ? "Modification…" : "Modifier le mot de passe"}
             </Button>
           </div>
         </form>
-      </div>
+      </section>
     </div>
   );
 }

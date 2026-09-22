@@ -1,179 +1,249 @@
 import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { MapPin, Pencil, Plus, Star, Trash2 } from "lucide-react";
-import { useStore } from "../../context/StoreContext";
+import {
+  useAddresses,
+  useDeleteAddress,
+  useSaveAddress,
+  useSetDefaultAddress,
+  useUpdateAddress,
+} from "../../hooks/useAccount";
+import { addressSchema, emptyAddress } from "../../schemas/address";
+import type { AddressFormInput } from "../../schemas/address";
+import { errorMessage } from "../../utils/errors";
 import { useToast } from "../../context/ToastContext";
-import type { Address } from "../../types";
 import Button from "../../components/ui/Button";
 import Modal from "../../components/ui/Modal";
-import ConfirmDialog from "../../components/ui/ConfirmDialog";
-import AddressFields, { emptyAddress, validateAddress } from "../../components/ui/AddressFields";
 import EmptyState from "../../components/ui/EmptyState";
-import { Checkbox } from "../../components/ui/Form";
-
-interface ModalState {
-  id: string | null;
-}
+import PageLoader from "../../components/ui/PageLoader";
+import ConfirmDialog from "../../components/ui/ConfirmDialog";
+import { Checkbox, Field, Input } from "../../components/ui/Form";
+import type { Address } from "../../types/api";
 
 export default function ClientAddresses() {
-  const { user, saveAddress, deleteAddress, setDefaultAddress } = useStore();
   const { toast } = useToast();
+  const { data: addresses = [], isLoading } = useAddresses();
+  const saveAddress = useSaveAddress();
+  const updateAddress = useUpdateAddress();
+  const deleteAddress = useDeleteAddress();
+  const setDefault = useSetDefaultAddress();
 
-  const [modal, setModal] = useState<ModalState | null>(null);
-  const [form, setForm] = useState<Address>(emptyAddress);
-  const [errors, setErrors] = useState<Partial<Record<keyof Address, string>>>({});
-  const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Address | null>(null);
+  const [creating, setCreating] = useState<boolean>(false);
+  const [toDelete, setToDelete] = useState<Address | null>(null);
 
-  if (!user) return null;
+  const form = useForm<AddressFormInput>({
+    resolver: zodResolver(addressSchema),
+    defaultValues: emptyAddress,
+  });
 
-  const openAdd = () => {
-    setForm({ ...emptyAddress, fullName: user.name });
-    setErrors({});
-    setModal({ id: null });
+  const openCreate = (): void => {
+    setEditing(null);
+    form.reset(emptyAddress);
+    setCreating(true);
   };
 
-  const openEdit = (addr: Address) => {
-    setForm({ ...emptyAddress, ...addr });
-    setErrors({});
-    setModal({ id: addr.id ?? null });
+  const openEdit = (address: Address): void => {
+    setEditing(address);
+    form.reset({
+      label: address.label ?? "",
+      fullName: address.fullName,
+      phone: address.phone,
+      addressLine1: address.addressLine1,
+      addressLine2: address.addressLine2 ?? "",
+      postalCode: address.postalCode ?? "",
+      city: address.city,
+      country: address.country,
+      isDefault: address.isDefault,
+    });
+    setCreating(true);
   };
 
-  const submit = () => {
-    const errs = validateAddress(form);
-    setErrors(errs);
-    if (Object.keys(errs).length) return;
-    const isDefault = form.isDefault || user.addresses.length === 0;
-    if (isDefault && !modal?.id) {
-      // Nouvelle adresse par défaut → réinitialiser les autres
-      user.addresses.forEach((a) => {
-        if (a.isDefault && a.id) setDefaultAddress(user.id, a.id);
-      });
+  const onSubmit = form.handleSubmit(async (values) => {
+    const payload = {
+      label: values.label || undefined,
+      fullName: values.fullName,
+      phone: values.phone,
+      addressLine1: values.addressLine1,
+      addressLine2: values.addressLine2 || undefined,
+      postalCode: values.postalCode || undefined,
+      city: values.city,
+      country: values.country || "Madagascar",
+      isDefault: values.isDefault,
+    };
+
+    try {
+      if (editing) {
+        await updateAddress.mutateAsync({ id: editing.id, input: payload });
+      } else {
+        await saveAddress.mutateAsync({ ...payload, isDefault: payload.isDefault ?? false });
+      }
+      setCreating(false);
+    } catch (error) {
+      toast(errorMessage(error), "error");
     }
-    saveAddress(user.id, { ...form, isDefault }, modal?.id ?? null);
-    setModal(null);
-    toast(modal?.id ? "Adresse modifiée." : "Adresse ajoutée à votre carnet.");
-  };
+  });
+
+  if (isLoading) {
+    return (
+      <div className="py-16">
+        <PageLoader label="Chargement des adresses…" />
+      </div>
+    );
+  }
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-headline-lg text-primary">Mes adresses</h1>
-          <p className="mt-1 text-body-md text-on-surface-variant">
-            Vos adresses de livraison, pour commander en un clin d'œil.
-          </p>
-        </div>
-        <Button onClick={openAdd} variant="accent">
-          <Plus size={17} /> Ajouter une adresse
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-headline-md text-primary">Mes adresses</h1>
+        <Button onClick={openCreate} size="sm">
+          <Plus size={16} /> Ajouter une adresse
         </Button>
       </div>
 
-      <div className="mt-6">
-        {user.addresses.length === 0 ? (
+      {addresses.length === 0 ? (
+        <div className="mt-6">
           <EmptyState
             icon={MapPin}
             title="Aucune adresse enregistrée"
-            text="Ajoutez une adresse pour accélérer vos prochaines commandes."
-            actionLabel="Ajouter ma première adresse"
-            onAction={openAdd}
+            text="Ajoutez une adresse pour commander plus rapidement."
+            actionLabel="Ajouter une adresse"
+            onAction={openCreate}
           />
-        ) : (
-          <div className="grid gap-4 sm:grid-cols-2">
-            {user.addresses.map((addr) => (
-              <div key={addr.id} className="card flex flex-col p-5">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="flex items-center gap-2 font-semibold text-primary">
+        </div>
+      ) : (
+        <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+          {addresses.map((address) => (
+            <li key={address.id} className="card flex flex-col p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-2 font-display text-headline-sm text-primary">
                     <MapPin size={16} className="text-secondary" />
-                    {addr.label || "Adresse"}
+                    {address.label || "Adresse"}
                   </p>
-                  {addr.isDefault && (
-                    <span className="rounded-full bg-secondary-container px-2.5 py-0.5 text-[10px] font-bold text-on-secondary-container">
-                      PAR DÉFAUT
+                  {address.isDefault && (
+                    <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-secondary-container px-2 py-0.5 text-[10px] font-bold text-on-secondary-container">
+                      <Star size={10} className="fill-current" /> PAR DÉFAUT
                     </span>
                   )}
                 </div>
-                <div className="mt-2 flex-1 text-body-sm text-on-surface-variant">
-                  <p className="font-medium text-primary">{addr.fullName}</p>
-                  <p>
-                    {addr.address}
-                    {addr.address2 ? `, ${addr.address2}` : ""}
-                  </p>
-                  <p>
-                    {addr.postalCode} {addr.city}, {addr.country}
-                  </p>
-                  <p>{addr.phone}</p>
-                </div>
-                <div className="mt-4 flex items-center gap-1 border-t border-surface-container-highest pt-3">
-                  {!addr.isDefault && addr.id && (
-                    <button
-                      onClick={() => {
-                        setDefaultAddress(user.id, addr.id!);
-                        toast("Adresse par défaut mise à jour.");
-                      }}
-                      className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-body-sm text-on-surface-variant transition-colors hover:bg-secondary-container/50 hover:text-on-secondary-container"
-                    >
-                      <Star size={15} /> Par défaut
-                    </button>
-                  )}
+                <div className="flex shrink-0 gap-1">
                   <button
-                    onClick={() => openEdit(addr)}
-                    className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-body-sm text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
+                    onClick={() => openEdit(address)}
+                    aria-label={"Modifier " + (address.label ?? "l'adresse")}
+                    className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-surface-container hover:text-primary"
                   >
-                    <Pencil size={15} /> Modifier
+                    <Pencil size={16} />
                   </button>
                   <button
-                    onClick={() => setConfirmId(addr.id ?? null)}
-                    className="ml-auto flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-body-sm text-on-surface-variant transition-colors hover:bg-red-50 hover:text-red-600"
+                    onClick={() => setToDelete(address)}
+                    aria-label={"Supprimer " + (address.label ?? "l'adresse")}
+                    className="rounded-lg p-2 text-on-surface-variant transition-colors hover:bg-red-50 hover:text-red-600"
                   >
-                    <Trash2 size={15} /> Supprimer
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Formulaire ajout / édition */}
+              <address className="mt-3 flex-1 not-italic text-body-sm text-on-surface-variant">
+                {address.fullName}
+                <br />
+                {address.addressLine1}
+                {address.addressLine2 ? (
+                  <>
+                    <br />
+                    {address.addressLine2}
+                  </>
+                ) : null}
+                <br />
+                {address.postalCode ? address.postalCode + " " : ""}
+                {address.city}
+                <br />
+                {address.country}
+                <br />
+                {address.phone}
+              </address>
+
+              {!address.isDefault && (
+                <button
+                  onClick={() => setDefault.mutate(address.id)}
+                  className="mt-4 self-start text-body-sm font-semibold text-secondary underline-offset-2 hover:underline"
+                >
+                  Définir par défaut
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
       <Modal
-        open={modal !== null}
-        onClose={() => setModal(null)}
-        title={modal?.id ? "Modifier l'adresse" : "Nouvelle adresse"}
+        open={creating}
+        onClose={() => setCreating(false)}
+        title={editing ? "Modifier l'adresse" : "Nouvelle adresse"}
+        size="md"
         footer={
           <>
-            <Button variant="outline" onClick={() => setModal(null)}>
+            <Button variant="outline" onClick={() => setCreating(false)}>
               Annuler
             </Button>
-            <Button variant="accent" onClick={submit}>
-              {modal?.id ? "Enregistrer" : "Ajouter"}
+            <Button onClick={onSubmit} disabled={saveAddress.isPending || updateAddress.isPending}>
+              {saveAddress.isPending || updateAddress.isPending ? "Enregistrement…" : "Enregistrer"}
             </Button>
           </>
         }
       >
-        <div className="space-y-4">
-          <AddressFields
-            value={form}
-            onChange={(key, val) => setForm((f) => ({ ...f, [key]: val }))}
-            errors={errors}
-            showLabel
-          />
-          <Checkbox
-            label="Définir comme adresse par défaut"
-            checked={!!form.isDefault}
-            onChange={(e) => setForm((f) => ({ ...f, isDefault: e.target.checked }))}
-          />
-        </div>
+        <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2" noValidate>
+          <Field label="Libellé" error={form.formState.errors.label?.message} className="sm:col-span-2">
+            <Input placeholder="Domicile, Bureau…" {...form.register("label")} />
+          </Field>
+          <Field label="Destinataire" required error={form.formState.errors.fullName?.message}>
+            <Input {...form.register("fullName")} />
+          </Field>
+          <Field label="Téléphone" required error={form.formState.errors.phone?.message}>
+            <Input placeholder="+261 34 12 345 67" {...form.register("phone")} />
+          </Field>
+          <Field
+            label="Adresse"
+            required
+            error={form.formState.errors.addressLine1?.message}
+            className="sm:col-span-2"
+          >
+            <Input {...form.register("addressLine1")} />
+          </Field>
+          <Field
+            label="Complément"
+            error={form.formState.errors.addressLine2?.message}
+            className="sm:col-span-2"
+          >
+            <Input {...form.register("addressLine2")} />
+          </Field>
+          <Field label="Code postal" error={form.formState.errors.postalCode?.message}>
+            <Input {...form.register("postalCode")} />
+          </Field>
+          <Field label="Ville" required error={form.formState.errors.city?.message}>
+            <Input {...form.register("city")} />
+          </Field>
+          <Field label="Pays" required error={form.formState.errors.country?.message}>
+            <Input {...form.register("country")} />
+          </Field>
+          <div className="sm:col-span-2">
+            <Checkbox label="Définir comme adresse par défaut" {...form.register("isDefault")} />
+          </div>
+        </form>
       </Modal>
 
       <ConfirmDialog
-        open={confirmId !== null}
-        onClose={() => setConfirmId(null)}
+        open={toDelete !== null}
+        onClose={() => setToDelete(null)}
         onConfirm={() => {
-          if (confirmId) deleteAddress(user.id, confirmId);
-          setConfirmId(null);
-          toast("Adresse supprimée.", "info");
+          if (toDelete) deleteAddress.mutate(toDelete.id);
+          setToDelete(null);
         }}
         title="Supprimer l'adresse"
-        message="Cette adresse sera définitivement retirée de votre carnet."
+        message="Cette adresse sera définitivement supprimée de votre carnet."
+        confirmLabel="Supprimer"
       />
     </div>
   );

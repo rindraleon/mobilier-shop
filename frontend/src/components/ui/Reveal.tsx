@@ -31,8 +31,7 @@ export default function Reveal({ children, delay = 0, className = "", as }: Reve
     return () => observer.disconnect();
   }, []);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const Tag: any = as ?? "div";
+  const Tag = (as ?? "div") as ElementType;
 
   return (
     <Tag ref={ref} style={{ transitionDelay: `${delay}s` }} className={`fade-up ${className}`}>

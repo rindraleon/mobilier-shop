@@ -42,7 +42,7 @@ export default function Button<T extends ElementType = "button">({
   const Comp: ElementType = as ?? "button";
   return (
     <Comp
-      className={`inline-flex items-center justify-center gap-2 rounded-lg transition-all duration-300 hover:-translate-y-0.5 hover:shadow-card-hover active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-none ${variants[variant]} ${sizes[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-lg transition-all duration-300 hover:shadow-card-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:shadow-none ${variants[variant]} ${sizes[size]} ${className}`}
       {...props}
     >
       {children}

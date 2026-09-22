@@ -20,7 +20,7 @@ export default function StatCard({ icon: Icon, label, value, sub, trend }: StatC
         <p className="mt-1 truncate font-display text-2xl text-primary">{value}</p>
         {sub && (
           <p className="mt-1 flex items-center gap-1 text-body-sm text-on-surface-variant">
-            {trend != null &&
+            {typeof trend === "number" &&
               (trend >= 0 ? (
                 <TrendingUp size={14} className="text-emerald-600" />
               ) : (

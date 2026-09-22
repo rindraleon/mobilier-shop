@@ -4,7 +4,20 @@ export class InitialSchema1787988354424 implements MigrationInterface {
     name = 'InitialSchema1787988354424'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+        // `uuid-ossp` est un module contrib absent de certains builds : on le
+        // crée s'il est disponible, sinon on alias `uuid_generate_v4()` sur
+        // `gen_random_uuid()` (cœur PostgreSQL ≥ 13). Voir la migration
+        // `UuidFallback` pour le détail.
+        const uuidExtension = (await queryRunner.query(
+          "SELECT COUNT(*)::int AS count FROM pg_available_extensions WHERE name = 'uuid-ossp'",
+        )) as Array<{ count: number }>;
+        if ((uuidExtension[0]?.count ?? 0) > 0) {
+          await queryRunner.query('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"');
+        } else {
+          await queryRunner.query(
+            "CREATE OR REPLACE FUNCTION uuid_generate_v4() RETURNS uuid AS 'SELECT gen_random_uuid()' LANGUAGE sql VOLATILE",
+          );
+        }
         await queryRunner.query(`CREATE TABLE "addresses" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "label" character varying(60), "full_name" character varying(160) NOT NULL, "phone" character varying(40) NOT NULL, "address_line1" character varying(200) NOT NULL, "address_line2" character varying(200), "postal_code" character varying(20), "city" character varying(120) NOT NULL, "country" character varying(120) NOT NULL DEFAULT 'Madagascar', "is_default" boolean NOT NULL DEFAULT false, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "PK_745d8f43d3af10ab8247465e450" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE INDEX "idx_addresses_user" ON "addresses" ("user_id") `);
         await queryRunner.query(`CREATE TYPE "public"."users_role_enum" AS ENUM('customer', 'seller', 'admin')`);

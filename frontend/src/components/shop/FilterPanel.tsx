@@ -1,24 +1,21 @@
-import type { Dispatch, SetStateAction } from "react";
-import { RotateCcw } from "lucide-react";
-import { categories } from "../../data/products";
+import { X } from "lucide-react";
+import { useCategories } from "../../hooks/useCatalog";
 import { PRICE_RANGES } from "../../utils/constants";
-import { Checkbox } from "../ui/Form";
+import type { Category } from "../../types/api";
 
 interface FilterPanelProps {
   categorie: string;
-  onCategorie: (categorie: string) => void;
+  onCategorie: (slug: string) => void;
   priceRanges: string[];
-  onPriceRanges: Dispatch<SetStateAction<string[]>>;
+  onPriceRanges: (ids: string[]) => void;
   inStockOnly: boolean;
-  onInStockOnly: Dispatch<SetStateAction<boolean>>;
-  counts: Record<string, number>;
-  total: number;
+  onInStockOnly: (value: boolean) => void;
   onReset: () => void;
+  /** Compteurs par catégorie renvoyés par l'API (`meta` de la recherche). */
+  counts?: Record<string, number>;
+  total?: number;
 }
 
-/**
- * Panneau de filtres réutilisable (desktop + mobile).
- */
 export default function FilterPanel({
   categorie,
   onCategorie,
@@ -26,76 +23,98 @@ export default function FilterPanel({
   onPriceRanges,
   inStockOnly,
   onInStockOnly,
+  onReset,
   counts,
   total,
-  onReset,
 }: FilterPanelProps) {
-  const togglePrice = (id: string): void =>
-    onPriceRanges((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const { data: categories = [] } = useCategories() as {
+    data: Category[] | undefined;
+  };
+
+  const toggleRange = (id: string): void => {
+    onPriceRanges(
+      priceRanges.includes(id) ? priceRanges.filter((r) => r !== id) : [...priceRanges, id],
+    );
+  };
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h3 className="mb-3 font-display text-headline-sm text-primary">Catégories</h3>
-        <ul className="space-y-1">
+    <div>
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-headline-sm text-primary">Filtres</h2>
+        <button
+          onClick={onReset}
+          className="inline-flex items-center gap-1 text-label-sm text-on-surface-variant transition-colors hover:text-secondary"
+        >
+          <X size={13} /> Réinitialiser
+        </button>
+      </div>
+
+      <div className="mt-5">
+        <p className="text-label-md uppercase tracking-wider text-on-surface-variant">Catégorie</p>
+        <ul className="mt-3 space-y-1.5">
           <li>
             <button
               onClick={() => onCategorie("toutes")}
-              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-body-sm transition-colors ${
+              className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-body-sm transition-colors ${
                 categorie === "toutes"
                   ? "bg-secondary-container font-semibold text-on-secondary-container"
                   : "text-on-surface-variant hover:bg-surface-container"
               }`}
             >
-              Toutes les catégories <span className="text-label-sm opacity-70">{total}</span>
+              Toutes
+              {total !== undefined && <span className="text-label-sm">{total}</span>}
             </button>
           </li>
-          {categories.map((cat) => (
-            <li key={cat.id}>
+          {categories.map((category) => (
+            <li key={category.id}>
               <button
-                onClick={() => onCategorie(cat.id)}
-                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-body-sm transition-colors ${
-                  categorie === cat.id
+                onClick={() => onCategorie(category.slug)}
+                className={`flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-body-sm transition-colors ${
+                  categorie === category.slug
                     ? "bg-secondary-container font-semibold text-on-secondary-container"
                     : "text-on-surface-variant hover:bg-surface-container"
                 }`}
               >
-                {cat.name} <span className="text-label-sm opacity-70">{counts[cat.id] || 0}</span>
+                {category.name}
+                {counts && counts[category.slug] !== undefined && (
+                  <span className="text-label-sm">{counts[category.slug]}</span>
+                )}
               </button>
             </li>
           ))}
         </ul>
       </div>
 
-      <div>
-        <h3 className="mb-3 font-display text-headline-sm text-primary">Prix</h3>
-        <div className="space-y-2.5">
+      <div className="mt-6">
+        <p className="text-label-md uppercase tracking-wider text-on-surface-variant">Prix</p>
+        <ul className="mt-3 space-y-2">
           {PRICE_RANGES.map((range) => (
-            <Checkbox
-              key={range.id}
-              label={range.label}
-              checked={priceRanges.includes(range.id)}
-              onChange={() => togglePrice(range.id)}
-            />
+            <li key={range.id}>
+              <label className="flex cursor-pointer items-center gap-2.5 text-body-sm text-on-surface-variant">
+                <input
+                  type="checkbox"
+                  checked={priceRanges.includes(range.id)}
+                  onChange={() => toggleRange(range.id)}
+                  className="h-4 w-4 rounded border-outline-variant accent-secondary"
+                />
+                {range.label}
+              </label>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
 
-      <div>
-        <h3 className="mb-3 font-display text-headline-sm text-primary">Disponibilité</h3>
-        <Checkbox
-          label="En stock uniquement"
-          checked={inStockOnly}
-          onChange={(e) => onInStockOnly(e.target.checked)}
-        />
+      <div className="mt-6">
+        <label className="flex cursor-pointer items-center gap-2.5 text-body-sm text-on-surface-variant">
+          <input
+            type="checkbox"
+            checked={inStockOnly}
+            onChange={(e) => onInStockOnly(e.target.checked)}
+            className="h-4 w-4 rounded border-outline-variant accent-secondary"
+          />
+          En stock uniquement
+        </label>
       </div>
-
-      <button
-        onClick={onReset}
-        className="flex items-center gap-1.5 text-body-sm font-medium text-secondary transition-colors hover:underline"
-      >
-        <RotateCcw size={14} /> Réinitialiser les filtres
-      </button>
     </div>
   );
 }

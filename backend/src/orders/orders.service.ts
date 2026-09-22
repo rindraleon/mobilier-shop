@@ -7,6 +7,7 @@ import { OrderItem } from './entities/order-item.entity';
 import { OrderStatusHistory } from './entities/order-status-history.entity';
 import { Product } from '../products/entities/product.entity';
 import { Address } from '../users/entities/address.entity';
+import { Payment } from '../payments/entities/payment.entity';
 import { BusinessException } from '../common/errors/business.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import {
@@ -412,7 +413,19 @@ export class OrdersService {
       throw BusinessException.notFound('Commande introuvable.', ErrorCode.ORDER_NOT_FOUND);
     }
 
-    if (actor.role === UserRole.ADMIN) return order;
+    // Le paiement est exposé ici (propriété non persistée) pour éviter au
+    // frontend un second aller-retour. Un vendeur ne voit pas le paiement
+    // global : il consulte /seller/payments pour ses propres lignes.
+    const attachPayment = async (): Promise<Order> => {
+      const payment = await this.dataSource.getRepository(Payment).findOne({
+        where: { orderId: order.id },
+        order: { createdAt: 'DESC' },
+      });
+      order.payment = payment ?? null;
+      return order;
+    };
+
+    if (actor.role === UserRole.ADMIN) return attachPayment();
     if (actor.role === UserRole.SELLER) {
       const concernsSeller = order.items?.some((item) => item.sellerId === actor.sellerId);
       if (!concernsSeller) {
@@ -421,7 +434,7 @@ export class OrdersService {
           ErrorCode.ORDER_NOT_OWNED,
         );
       }
-      // Le vendeur ne voit QUE ses propres articles.
+      // Le vendeur ne voit QUE ses propres articles (et aucun paiement global).
       order.items = order.items.filter((item) => item.sellerId === actor.sellerId);
       return order;
     }
@@ -431,7 +444,7 @@ export class OrdersService {
         ErrorCode.ORDER_NOT_OWNED,
       );
     }
-    return order;
+    return attachPayment();
   }
 
   /* --------------------------------- Statuts --------------------------------- */

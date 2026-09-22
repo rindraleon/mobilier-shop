@@ -23,6 +23,20 @@ export interface DateRange {
   to: Date;
 }
 
+/**
+ * Normalise un montant renvoyé par PostgreSQL.
+ *
+ * `SUM(...)::bigint` dépasse la capacité d'un INTEGER JavaScript sérialisable
+ * de façon fiable : le pilote `pg` renvoie donc une **chaîne** (« 8990000 »).
+ * Sans cette conversion, l'API exposerait des montants en `string` et le
+ * frontend devrait deviner le type — source de bugs d'affichage et de tri.
+ */
+function toNumber(value: number | string | null | undefined): number {
+  if (value === null || value === undefined) return 0;
+  const parsed = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 @Injectable()
 export class AnalyticsService {
   constructor(
@@ -147,21 +161,24 @@ export class AnalyticsService {
     };
   }
 
+  /**
+   * Chiffre d'affaires et commandes agrégés par jour.
+   *
+   * ATTENTION : `dataSource.query()` avec un tableau de paramètres délègue au
+   * pilote `pg`, qui ne comprend que les marqueurs positionnels `$1…$n`.
+   * Mélanger un marqueur nommé (`:sellerId`) avec `$1` provoquait une
+   * `syntax error at or near ":"`. On reste donc intégralement positionnel.
+   */
   async salesOverTime(period: PeriodKey = '30d', from?: string, to?: string, sellerId?: string) {
     const range = this.resolveRange(period, from, to);
-    const params: Record<string, unknown> = {
-      from: range.from,
-      to: range.to,
-      statuses: REVENUE_STATUSES,
-    };
+    const params: unknown[] = [REVENUE_STATUSES, range.from, range.to];
     let sellerJoin = '';
     if (sellerId) {
-      sellerJoin =
-        'INNER JOIN order_items oi ON oi."order_id" = o.id AND oi."seller_id" = :sellerId';
-      params.sellerId = sellerId;
+      sellerJoin = 'INNER JOIN order_items oi ON oi."order_id" = o.id AND oi."seller_id" = $4';
+      params.push(sellerId);
     }
 
-    const rows = await this.dataSource.query(
+    const rows = (await this.dataSource.query(
       `SELECT to_char(date_trunc('day', o."created_at"), 'YYYY-MM-DD') AS date,
               COALESCE(SUM(o.total), 0)::bigint AS revenue,
               COUNT(DISTINCT o.id)::int AS orders
@@ -171,9 +188,15 @@ export class AnalyticsService {
           AND o."created_at" BETWEEN $2 AND $3
         GROUP BY 1
         ORDER BY 1 ASC`,
-      [REVENUE_STATUSES, range.from, range.to],
-    );
-    return rows as { date: string; revenue: number; orders: number }[];
+      params,
+    )) as { date: string; revenue: number | string; orders: number }[];
+
+    // SUM(...)::bigint est renvoyé en chaîne par le pilote pg : on normalise.
+    return rows.map((row) => ({
+      date: row.date,
+      revenue: toNumber(row.revenue),
+      orders: Number(row.orders ?? 0),
+    }));
   }
 
   async topProducts(limit = 10, sellerId?: string) {
@@ -183,7 +206,7 @@ export class AnalyticsService {
       where += ' AND oi."seller_id" = $3';
       params.push(sellerId);
     }
-    return this.dataSource.query(
+    const rows = (await this.dataSource.query(
       `SELECT oi."product_id" AS "productId",
               oi.name,
               SUM(oi.quantity)::int AS "unitsSold",
@@ -195,12 +218,19 @@ export class AnalyticsService {
         ORDER BY "unitsSold" DESC
         LIMIT $2`,
       params,
-    ) as Promise<{ productId: string; name: string; unitsSold: number; revenue: number }[]>;
+    )) as { productId: string; name: string; unitsSold: number; revenue: number | string }[];
+
+    return rows.map((row) => ({
+      productId: row.productId,
+      name: row.name,
+      unitsSold: Number(row.unitsSold ?? 0),
+      revenue: toNumber(row.revenue),
+    }));
   }
 
   async salesByCategory(period: PeriodKey = '30d') {
     const range = this.resolveRange(period);
-    return this.dataSource.query(
+    const rows = (await this.dataSource.query(
       `SELECT c.id AS "categoryId", c.name,
               COALESCE(SUM(oi."line_total"), 0)::bigint AS revenue,
               COALESCE(SUM(oi.quantity), 0)::int AS "unitsSold"
@@ -213,12 +243,24 @@ export class AnalyticsService {
         GROUP BY c.id, c.name
         ORDER BY revenue DESC`,
       [REVENUE_STATUSES, range.from, range.to],
-    );
+    )) as {
+      categoryId: string;
+      name: string;
+      revenue: number | string;
+      unitsSold: number;
+    }[];
+
+    return rows.map((row) => ({
+      categoryId: row.categoryId,
+      name: row.name,
+      revenue: toNumber(row.revenue),
+      unitsSold: Number(row.unitsSold ?? 0),
+    }));
   }
 
   async salesBySeller(period: PeriodKey = '30d') {
     const range = this.resolveRange(period);
-    return this.dataSource.query(
+    const rows = (await this.dataSource.query(
       `SELECT s.id AS "sellerId", s."shop_name" AS "shopName",
               COALESCE(SUM(oi."line_total"), 0)::bigint AS revenue,
               COALESCE(SUM(oi.quantity), 0)::int AS "unitsSold",
@@ -231,7 +273,21 @@ export class AnalyticsService {
         GROUP BY s.id, s."shop_name"
         ORDER BY revenue DESC`,
       [REVENUE_STATUSES, range.from, range.to],
-    );
+    )) as {
+      sellerId: string;
+      shopName: string;
+      revenue: number | string;
+      unitsSold: number;
+      orders: number;
+    }[];
+
+    return rows.map((row) => ({
+      sellerId: row.sellerId,
+      shopName: row.shopName,
+      revenue: toNumber(row.revenue),
+      unitsSold: Number(row.unitsSold ?? 0),
+      orders: Number(row.orders ?? 0),
+    }));
   }
 
   async ordersByStatus() {
@@ -268,7 +324,24 @@ export class AnalyticsService {
       [REVENUE_STATUSES],
     );
 
-    return { newCustomers, topCustomers };
+    return {
+      newCustomers,
+      topCustomers: (
+        topCustomers as {
+          id: string;
+          email: string;
+          name: string;
+          revenue: number | string;
+          orders: number;
+        }[]
+      ).map((row) => ({
+        id: row.id,
+        email: row.email,
+        name: row.name,
+        revenue: toNumber(row.revenue),
+        orders: Number(row.orders ?? 0),
+      })),
+    };
   }
 
   /* ----------------------------- Seller dashboard ---------------------------- */
