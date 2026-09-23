@@ -19,10 +19,7 @@ export const authApi = {
   login: (email: string, password: string) =>
     api.post<AuthResponse>("/auth/login", { email, password }, { auth: false }),
 
-  /**
-   * Rafraîchit la session. Le backend privilégie le cookie httpOnly ; le jeton
-   * en mémoire sert de repli si le navigateur le refuse.
-   */
+  
   refresh: (refreshToken?: string | null) =>
     api.post<AuthResponse>("/auth/refresh", refreshToken ? { refreshToken } : {}, {
       auth: false,

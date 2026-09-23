@@ -1,29 +1,10 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-/**
- * Rendre la génération d'UUID indépendante du module « contrib » `uuid-ossp`.
- *
- * TypeORM émet `DEFAULT uuid_generate_v4()` pour toute entité déclarée avec
- * `@PrimaryGeneratedColumn('uuid')` — 19 entités dans ce projet. Or
- * `uuid-ossp` est un module **contrib**, absent de plusieurs distributions
- * PostgreSQL (paquets minimalistes, certaines offres managées). Sans lui, la
- * moindre insertion échoue :
- *
- *   could not access file "uuid-ossp": No such file or directory → HTTP 500
- *
- * PostgreSQL ≥ 13 fournit `gen_random_uuid()` **dans le cœur**. On crée donc
- * l'extension lorsqu'elle est disponible ; sinon on alias
- * `uuid_generate_v4()` vers `gen_random_uuid()`. Le schéma et le code
- * applicatif restent identiques, et le projet démarre sur n'importe quel
- * PostgreSQL ≥ 13.
- *
- * Le test de disponibilité est fait **en TypeScript** et non dans un bloc
- * `DO \$\$ …`, car ce dernier exige l'extension `plpgsql`, elle aussi
- * absente des builds les plus minimalistes.
- */
 export class UuidFallback1789145307790 implements MigrationInterface {
   name = 'UuidFallback1789145307790';
 
+  // uuid-ossp est absent de certains Postgres managés : on retombe sur gen_random_uuid().
+  // Les deux produisent des UUID v4, donc le schéma reste identique.
   public async up(queryRunner: QueryRunner): Promise<void> {
     const rows = (await queryRunner.query(
       "SELECT COUNT(*)::int AS count FROM pg_available_extensions WHERE name = 'uuid-ossp'",

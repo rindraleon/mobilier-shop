@@ -6,14 +6,8 @@ import { APPROVED_SELLER_KEY } from '../decorators/approved-seller.decorator';
 import { BusinessException } from '../errors/business.exception';
 import { ErrorCode } from '../errors/error-codes';
 import { Seller } from '../../sellers/entities/seller.entity';
-import type { JwtUser } from '../decorators/current-user.decorator';
+import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 
-/**
- * Exige un vendeur réellement APPROVED au moment de la requête.
- * Le statut est relu en base (le JWT peut être périmé : suspension immédiate).
- *
- * Ordre logique : JWT valide (401) → rôle (403) → vendeur approuvé (403).
- */
 @Injectable()
 export class SellerApprovedGuard implements CanActivate {
   constructor(
@@ -28,8 +22,8 @@ export class SellerApprovedGuard implements CanActivate {
     ]);
     if (!required) return true;
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as JwtUser | undefined;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = request.user;
     if (!user) return false;
 
     // L'admin opère pour la plateforme : il n'a pas besoin de boutique approuvée.

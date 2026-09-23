@@ -13,10 +13,7 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        /**
-         * Découpage stable : React et les dépendances lourdes restent dans un
-         * chunk séparé, mis en cache par le navigateur entre deux déploiements.
-         */
+        // Chunks stables : le navigateur les garde en cache d'un déploiement à l'autre.
         manualChunks: {
           vendor: ["react", "react-dom", "react-router-dom"],
           query: ["@tanstack/react-query"],
@@ -35,11 +32,8 @@ export default defineConfig({
     host: true,
     port: 5173,
     allowedHosts: true,
-    /**
-     * En développement, l'API NestJS est servie sur le même origine via ce
-     * proxy : le frontend n'a donc jamais besoin de connaître l'URL du
-     * backend et aucun cookie n'est cross-origin (§50).
-     */
+    // Même origine en développement (§50) : le frontend ignore l'URL du backend
+    // et aucun cookie n'est cross-origin.
     proxy: {
       "/api": {
         target: process.env.VITE_PROXY_TARGET ?? "http://localhost:3000",

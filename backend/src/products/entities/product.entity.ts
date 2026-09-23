@@ -15,10 +15,6 @@ import { Category } from '../../categories/entities/category.entity';
 import { Seller } from '../../sellers/entities/seller.entity';
 import { ProductImage } from './product-image.entity';
 
-/**
- * Montants exprimés en MGA entiers (jamais de float pour l'argent).
- * `stock` est vérifié et décrémenté côté serveur dans une transaction.
- */
 @Entity('products')
 @Index('idx_products_seller', ['sellerId'])
 @Index('idx_products_category', ['categoryId'])

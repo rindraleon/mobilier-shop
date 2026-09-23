@@ -1,10 +1,4 @@
-/**
- * Types miroir de l'API NestJS MOBILIER-SHOP.
- *
- * Règle (§52) : aucun `any`. Ces types sont la source de vérité du frontend et
- * doivent rester synchrones avec les DTO de réponse du backend
- * (`backend/src/**\/dto/*.dto.ts`).
- */
+
 
 /* ------------------------------------------------------------------ */
 /* Génériques                                                          */
@@ -416,15 +410,6 @@ export interface Order {
   updatedAt: string;
 }
 
-/**
- * Réponse d'une mutation de commande (création, annulation, transition).
- *
- * Vérifié sur l'API : ces endpoints renvoient l'entité **sans** `payment` ni
- * `statusHistory`, qui ne sont chargés que par `GET /orders/:id`. On le
- * matérialise dans le typage pour interdire de mettre cette réponse en cache
- * à la place d'une commande complète — ce qui ferait planter les pages de
- * détail (`order.statusHistory.length`).
- */
 export type OrderMutationResult = Omit<Order, "payment" | "statusHistory">;
 
 export interface CreateOrderInput {
@@ -644,12 +629,6 @@ export interface UploadRules {
 /* Favoris                                                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * Article de la liste de favoris.
- *
- * `GET /wishlist` renvoie un **tableau plat** (vérifié sur l'API) et non un
- * objet `{ items }` : on colle exactement à la réponse du serveur.
- */
 export interface WishlistItem {
   id: string;
   slug: string;

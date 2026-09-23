@@ -51,11 +51,11 @@ describe("isPurchasable", () => {
   });
 
   it("refuse un produit en rupture", () => {
-    expect(isPurchasable({ ...baseProduct, stock: 0 } as Product)).toBe(false);
+    expect(isPurchasable({ ...baseProduct, stock: 0 })).toBe(false);
   });
 
   it("refuse un produit non publié", () => {
-    expect(isPurchasable({ ...baseProduct, status: "draft" } as Product)).toBe(false);
+    expect(isPurchasable({ ...baseProduct, status: "draft" })).toBe(false);
   });
 });
 

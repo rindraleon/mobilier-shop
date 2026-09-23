@@ -27,10 +27,6 @@ type ButtonProps<T extends ElementType> = ComponentPropsWithoutRef<T> & {
   children?: ReactNode;
 };
 
-/**
- * Bouton polymorphe et réutilisable.
- * Exemple : <Button as={Link} to="/boutique">Voir</Button>
- */
 export default function Button<T extends ElementType = "button">({
   as,
   variant = "primary",

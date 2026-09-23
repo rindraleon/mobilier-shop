@@ -28,10 +28,6 @@ export class SellersService {
 
   /* -------------------------------- Candidature ------------------------------ */
 
-  /**
-   * Crée (ou renouvelle) une demande vendeur.
-   * La demande part toujours en PENDING : aucune publication n'est possible.
-   */
   async apply(userId: string, dto: ApplySellerDto, request?: Request): Promise<Seller> {
     const existing = await this.sellers.findOne({ where: { userId } });
 

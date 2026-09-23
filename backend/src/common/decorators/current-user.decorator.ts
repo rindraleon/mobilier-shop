@@ -1,12 +1,13 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
 import type { Request } from 'express';
+import { SellerStatus, UserRole } from '../enums';
 
-/** Utilisateur injecté par la stratégie JWT. */
+/** Utilisateur injecté par la stratégie JWT (rôle et statut validés à la lecture du jeton). */
 export interface JwtUser {
   id: string;
   email: string;
-  role: string;
-  sellerStatus?: string | null;
+  role: UserRole;
+  sellerStatus?: SellerStatus | null;
   sellerId?: string | null;
 }
 

@@ -25,17 +25,10 @@ export class CartService {
 
   private async getOrCreateCart(userId: string): Promise<Cart> {
     let cart = await this.carts.findOne({ where: { userId } });
-    if (!cart) {
-      cart = await this.carts.save(this.carts.create({ userId }));
-    }
+    cart ??= await this.carts.save(this.carts.create({ userId }));
     return cart;
   }
 
-  /**
-   * Panier avec montants RECALCULÉS côté serveur.
-   * Le frontend n'envoie jamais de prix : seul le couple (productId, quantity)
-   * est accepté.
-   */
   async getCart(userId: string): Promise<CartResponseDto> {
     const cart = await this.getOrCreateCart(userId);
     const items = await this.items.find({

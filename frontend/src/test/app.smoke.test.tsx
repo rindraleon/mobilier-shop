@@ -3,14 +3,6 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { RenderResult } from "@testing-library/react";
 
-/**
- * Test de fumée de l'intégration (§96).
- *
- * Objectif : garantir que les pages se montent sans erreur et consomment
- * bien la couche API (aucun `localStorage`, aucun contexte supprimé).
- * Le réseau est simulé au niveau du client HTTP : c'est le seul point d'appel.
- */
-
 const authState = { user: null as { fullName: string; role: string; firstName: string } | null };
 
 vi.mock("../lib/api/client", () => ({

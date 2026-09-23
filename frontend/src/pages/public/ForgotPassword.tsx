@@ -52,7 +52,7 @@ export default function ForgotPassword() {
               </Link>
             </>
           ) : (
-            <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+            <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-4" noValidate>
               <p className="text-body-sm text-on-surface-variant">
                 Saisissez l'adresse e-mail de votre compte. Nous vous enverrons un lien pour
                 choisir un nouveau mot de passe.

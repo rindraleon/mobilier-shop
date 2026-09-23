@@ -11,12 +11,6 @@ import { AnalyticsProcessor } from './processors/analytics.processor';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { MailModule } from '../mail/mail.module';
 
-/**
- * Enregistre les workers BullMQ.
- * Les producteurs passent par QueueService, qui dégrade proprement
- * si Redis n'est pas disponible — ce module n'est donc importé que
- * lorsque les files sont activées (QUEUE_ENABLED=true).
- */
 @Module({
   imports: [
     MailModule,

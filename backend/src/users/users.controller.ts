@@ -11,7 +11,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 import { UsersService } from './users.service';
 import { CurrentUser, type JwtUser } from '../common/decorators/current-user.decorator';
 import {
@@ -44,7 +44,7 @@ export class UsersController {
   async updateProfile(
     @CurrentUser() user: JwtUser,
     @Body() dto: UpdateProfileDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<UserResponseDto> {
     const updated = await this.usersService.updateProfile(user.id, dto, request);
     return toUserResponse(updated);
@@ -56,7 +56,7 @@ export class UsersController {
   async changePassword(
     @CurrentUser() user: JwtUser,
     @Body() dto: ChangePasswordDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<{ message: string }> {
     await this.usersService.changePassword(user.id, dto.currentPassword, dto.newPassword, request);
     return { message: 'Mot de passe mis à jour. Toutes vos sessions ont été révoquées.' };

@@ -11,7 +11,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 import { SellersService } from './sellers.service';
 import { CurrentUser, type JwtUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -42,7 +42,7 @@ export class SellersController {
   async apply(
     @CurrentUser() user: JwtUser,
     @Body() dto: ApplySellerDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Seller> {
     return this.sellersService.apply(user.id, dto, request);
   }
@@ -68,7 +68,7 @@ export class SellersController {
   async updateMe(
     @CurrentUser() user: JwtUser,
     @Body() dto: UpdateSellerDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Seller> {
     return this.sellersService.updateMine(user.id, dto, request);
   }
@@ -97,7 +97,7 @@ export class SellersController {
   async approve(
     @Param('id') id: string,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Seller> {
     return this.sellersService.approve(id, admin.id, request);
   }
@@ -110,7 +110,7 @@ export class SellersController {
     @Param('id') id: string,
     @Body() body: { reason?: string },
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Seller> {
     return this.sellersService.reject(id, admin.id, body?.reason ?? 'Motif non précisé.', request);
   }
@@ -123,7 +123,7 @@ export class SellersController {
     @Param('id') id: string,
     @Body() body: { reason?: string },
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Seller> {
     return this.sellersService.suspend(id, admin.id, body?.reason ?? 'Motif non précisé.', request);
   }

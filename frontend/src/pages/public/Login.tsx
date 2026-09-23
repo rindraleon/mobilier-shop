@@ -106,7 +106,7 @@ export default function Login() {
           </div>
 
           {tab === "login" ? (
-            <form onSubmit={onLogin} className="mt-6 space-y-4" noValidate>
+            <form onSubmit={(event) => void onLogin(event)} className="mt-6 space-y-4" noValidate>
               <Field label="Adresse e-mail" required error={loginForm.formState.errors.email?.message}>
                 <Input
                   type="email"
@@ -154,7 +154,7 @@ export default function Login() {
               </Button>
             </form>
           ) : (
-            <form onSubmit={onRegister} className="mt-6 space-y-4" noValidate>
+            <form onSubmit={(event) => void onRegister(event)} className="mt-6 space-y-4" noValidate>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Prénom" required error={registerForm.formState.errors.firstName?.message}>
                   <Input autoComplete="given-name" {...registerForm.register("firstName")} />

@@ -15,13 +15,6 @@ export function useCart(enabled = true) {
   });
 }
 
-/**
- * Mutations du panier.
- *
- * Pas d'update optimiste sur le total : le serveur est seul légitime pour
- * calculer les montants (§62). On invalide simplement le cache, ce qui
- * garantit un affichage toujours conforme au backend.
- */
 export function useAddCartItem() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -31,7 +24,7 @@ export function useAddCartItem() {
       cartApi.addItem(productId, quantity),
     onSuccess: (cart) => {
       queryClient.setQueryData(queryKeys.cart.all, cart);
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
       toast("Article ajouté au panier.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -47,7 +40,7 @@ export function useUpdateCartItem() {
       cartApi.updateItem(itemId, quantity),
     onSuccess: (cart) => {
       queryClient.setQueryData(queryKeys.cart.all, cart);
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
   });
@@ -61,7 +54,7 @@ export function useRemoveCartItem() {
     mutationFn: (itemId: string) => cartApi.removeItem(itemId),
     onSuccess: (cart) => {
       queryClient.setQueryData(queryKeys.cart.all, cart);
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
       toast("Article retiré du panier.", "info");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -75,7 +68,7 @@ export function useClearCart() {
     mutationFn: () => cartApi.clear(),
     onSuccess: (cart) => {
       queryClient.setQueryData(queryKeys.cart.all, cart);
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
     },
     onError: () => queryClient.invalidateQueries({ queryKey: queryKeys.cart.all }),
   });

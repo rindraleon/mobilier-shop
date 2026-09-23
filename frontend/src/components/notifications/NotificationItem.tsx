@@ -9,12 +9,6 @@ interface NotificationItemProps {
   compact?: boolean;
 }
 
-/**
- * Lien vers la ressource concernée, quand elle est déductible (§31).
- *
- * Selon l'événement, le backend fournit soit `orderId` (lien direct vers le
- * suivi), soit uniquement `orderNumber` (on retombe sur la liste).
- */
 function targetOf(notification: Notification): string | null {
   const data = notification.data ?? {};
 

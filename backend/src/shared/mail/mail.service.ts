@@ -10,10 +10,6 @@ export interface MailMessage {
   text?: string;
 }
 
-/**
- * Service d'envoi d'e-mails. En développement (MAIL_ENABLED=false),
- * les e-mails sont journalisés au lieu d'être envoyés.
- */
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);

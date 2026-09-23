@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import { IdempotencyKey } from '../entities/idempotency-key.entity';
 import { BusinessException } from '../errors/business.exception';
 import { ErrorCode } from '../errors/error-codes';
@@ -13,11 +13,6 @@ export interface IdempotencyResult<T> {
 
 const TTL_MS = 24 * 60 * 60 * 1000;
 
-/**
- * Protection contre les doubles soumissions (création de commande, paiement).
- * Même clé + même payload → la réponse mise en cache est renvoyée.
- * Même clé + payload différent → 409.
- */
 @Injectable()
 export class IdempotencyService {
   private readonly logger = new Logger(IdempotencyService.name);

@@ -35,11 +35,7 @@ export default function Shop() {
     setPage(1);
   };
 
-  /**
-   * Les filtres sont appliqués **côté serveur** (§45) : on n'envoie que la
-   * page courante, le total est renvoyé dans `meta`.
-   * Les fourchettes de prix sont traduites en bornes min/max.
-   */
+  
   const priceBounds = useMemo(() => {
     if (priceRanges.length === 0) return {};
     const selected = PRICE_RANGES.filter((r) => priceRanges.includes(r.id));

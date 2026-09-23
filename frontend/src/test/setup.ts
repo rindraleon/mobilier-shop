@@ -1,10 +1,5 @@
 import "@testing-library/jest-dom/vitest";
 
-/**
- * jsdom n'implémente pas encore ces API de navigateur utilisées par
- * `Reveal` (IntersectionObserver) et `ScrollToTop` (window.scrollTo).
- * On fournit des substituts neutres pour pouvoir monter l'application.
- */
 class MockIntersectionObserver implements IntersectionObserver {
   readonly root = null;
   readonly rootMargin = "";
@@ -18,12 +13,12 @@ class MockIntersectionObserver implements IntersectionObserver {
 }
 
 globalThis.IntersectionObserver =
-  MockIntersectionObserver as unknown as typeof IntersectionObserver;
+  MockIntersectionObserver;
 
 if (typeof window !== "undefined") {
-  window.scrollTo = (() => undefined) as unknown as typeof window.scrollTo;
+  window.scrollTo = () => undefined;
   if (!window.matchMedia) {
-    window.matchMedia = ((query: string) => ({
+    window.matchMedia = (query: string) => ({
       matches: false,
       media: query,
       onchange: null,
@@ -32,6 +27,6 @@ if (typeof window !== "undefined") {
       addEventListener: () => undefined,
       removeEventListener: () => undefined,
       dispatchEvent: () => false,
-    })) as unknown as typeof window.matchMedia;
+    });
   }
 }

@@ -9,10 +9,7 @@ import type {
 } from "../../types/api";
 
 export const ordersApi = {
-  /**
-   * Crée la commande. Le montant est recalculé côté serveur (§21, §87) et
-   * `Idempotency-Key` protège contre la double soumission (§89, §90).
-   */
+  
   create: (input: CreateOrderInput, idempotencyKey?: string) =>
     api.post<OrderMutationResult>("/orders", input, { idempotencyKey }),
 

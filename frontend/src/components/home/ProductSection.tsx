@@ -14,9 +14,6 @@ interface ProductSectionProps {
   viewAllLabel?: string;
 }
 
-/**
- * Section produits réutilisable (collection signature, nouveautés…).
- */
 export default function ProductSection({
   eyebrow,
   title,

@@ -26,7 +26,7 @@ export default function FilterPanel({
   onReset,
   counts,
   total,
-}: FilterPanelProps) {
+}: Readonly<FilterPanelProps>) {
   const { data: categories = [] } = useCategories() as {
     data: Category[] | undefined;
   };
@@ -76,7 +76,7 @@ export default function FilterPanel({
                 }`}
               >
                 {category.name}
-                {counts && counts[category.slug] !== undefined && (
+                {counts?.[category.slug] !== undefined && (
                   <span className="text-label-sm">{counts[category.slug]}</span>
                 )}
               </button>

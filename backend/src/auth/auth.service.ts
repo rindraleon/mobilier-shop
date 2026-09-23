@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, LessThan, Repository } from 'typeorm';
 import * as argon2 from 'argon2';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 import type { Request, Response } from 'express';
 import { UsersService } from '../users/users.service';
 import { User } from '../users/entities/user.entity';
@@ -25,15 +25,6 @@ const REFRESH_TOKEN_BYTES = 48;
 const RESET_TOKEN_BYTES = 32;
 const RESET_TOKEN_TTL_MINUTES = 30;
 
-/**
- * Verrouillage de compte (anti force brute).
- *
- * Le limiteur global de NestJS compte par **adresse IP** : il bloque un
- * assaillant qui martèle depuis une machine, mais ni une attaque répartie sur
- * plusieurs IP, ni le fait qu'un bureau entier partage la même IP sortante ne
- * sont correctement traités. On ajoute donc un compteur **par compte**, qui
- * protège le mot de passe lui-même, quelle que soit la provenance.
- */
 const LOGIN_MAX_ATTEMPTS_DEFAULT = 5;
 const LOGIN_LOCK_TTL_SECONDS_DEFAULT = 15 * 60;
 
@@ -41,10 +32,6 @@ const LOGIN_LOCK_TTL_SECONDS_DEFAULT = 15 * 60;
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
-  /**
-   * Repli mémoire lorsque Redis est indisponible : la protection doit rester
-   * active même sans Redis, quitte à n'être valable que pour cette instance.
-   */
   private readonly loginFailures = new Map<string, { count: number; expiresAt: number }>();
 
   constructor(
@@ -105,15 +92,8 @@ export class AuthService {
 
   /* --------------------------------- Login ---------------------------------- */
 
-  /**
-   * Clé du compteur d'échecs. L'e-mail est haché : on ne stocke jamais
-   * d'adresse en clair dans Redis.
-   */
   private loginFailureKey(email: string): string {
-    const digest = crypto
-      .createHash('sha256')
-      .update(email.trim().toLowerCase())
-      .digest('hex');
+    const digest = crypto.createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
     return `auth:login-fail:${digest}`;
   }
 

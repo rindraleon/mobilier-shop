@@ -47,7 +47,7 @@ export default function ResetPassword() {
               .
             </p>
           ) : (
-            <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+            <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-4" noValidate>
               <Field
                 label="Nouveau mot de passe"
                 required

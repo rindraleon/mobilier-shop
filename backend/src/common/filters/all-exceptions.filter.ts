@@ -11,11 +11,6 @@ import { BusinessException } from '../errors/business.exception';
 import { ErrorCode } from '../errors/error-codes';
 import type { ApiErrorResponse } from '../interfaces/error-response.interface';
 
-/**
- * Filtre global : garantit une enveloppe d'erreur JSON unique :
- * { statusCode, message, code, errors?, timestamp, path, requestId }
- * Ne laisse jamais fuiter de secret ni de stack trace en production.
- */
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger('ExceptionFilter');
@@ -25,16 +20,16 @@ export class AllExceptionsFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request & { id?: string }>();
 
-    const status =
+    const status: HttpStatus =
       exception instanceof HttpException ? exception.getStatus() : HttpStatus.INTERNAL_SERVER_ERROR;
 
     let message: string | string[] = 'Une erreur inattendue est survenue.';
-    let code: string = ErrorCode.INTERNAL_ERROR;
+    let code: ErrorCode = ErrorCode.INTERNAL_ERROR;
     let errors: Record<string, string[]> | undefined;
 
     if (exception instanceof BusinessException) {
       message = (exception.getResponse() as { message: string | string[] }).message;
-      code = exception.code;
+      code = exception.code as ErrorCode;
       errors = exception.details as Record<string, string[]> | undefined;
     } else if (exception instanceof HttpException) {
       const payload = exception.getResponse();
@@ -83,7 +78,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
     response.status(status).json(body);
   }
 
-  private mapStatusToCode(status: number, fallback?: string): string {
+  private mapStatusToCode(status: HttpStatus, fallback?: string): ErrorCode {
     switch (status) {
       case HttpStatus.BAD_REQUEST:
         return ErrorCode.BAD_REQUEST;
@@ -106,7 +101,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       case HttpStatus.INTERNAL_SERVER_ERROR:
         return ErrorCode.INTERNAL_ERROR;
       default:
-        return fallback ?? ErrorCode.BAD_REQUEST;
+        return (fallback as ErrorCode) ?? ErrorCode.BAD_REQUEST;
     }
   }
 }

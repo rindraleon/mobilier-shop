@@ -12,7 +12,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 import { CategoriesService } from './categories.service';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -56,7 +56,10 @@ export class CategoriesController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: '[Admin] Créer une catégorie' })
   @ApiResponse({ status: 201, type: CategoryResponseDto })
-  async create(@Body() dto: CreateCategoryDto, @Req() request: Request): Promise<Category> {
+  async create(
+    @Body() dto: CreateCategoryDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<Category> {
     return this.categoriesService.create(dto, request);
   }
 
@@ -67,7 +70,7 @@ export class CategoriesController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateCategoryDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Category> {
     return this.categoriesService.update(id, dto, request);
   }
@@ -77,7 +80,7 @@ export class CategoriesController {
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: '[Admin] Supprimer une catégorie (soft delete)' })
-  async remove(@Param('id') id: string, @Req() request: Request): Promise<void> {
+  async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<void> {
     await this.categoriesService.remove(id, request);
   }
 }

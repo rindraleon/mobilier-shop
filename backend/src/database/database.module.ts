@@ -19,11 +19,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
         // synchronize uniquement en secours local, jamais en production.
         synchronize: config.get<boolean>('database.synchronize') ?? false,
         logging: config.get<boolean>('database.logging') ? ['error', 'warn', 'schema'] : ['error'],
-        migrations: [__dirname + '/migrations/*{.ts,.js}'],
-        migrationsRun: false,
-        migrationsTableName: 'migrations',
-        // Les migrations sont exécutées explicitement : `npm run migration:run`.
-        entities: [__dirname + '/../**/*.entity{.ts,.js}'],
+        migrations: [__dirname + '/migrations*.entity{.ts,.js}'],
       }),
     }),
   ],

@@ -29,7 +29,7 @@ interface IconBtnProps {
   children: ReactNode;
 }
 
-function IconBtn({ onClick, label, badge = 0, children }: IconBtnProps) {
+function IconBtn({ onClick, label, badge = 0, children }: Readonly<IconBtnProps>) {
   return (
     <button
       onClick={onClick}
@@ -86,10 +86,7 @@ export default function Navbar() {
 
   return (
     <>
-      <div className="bg-primary px-4 py-2 text-center text-label-sm text-on-primary">
-        Livraison offerte dès 1 500 000 Ar · Paiement MVola, Orange Money &amp; Airtel Money
-      </div>
-
+      
       <header
         className={`sticky top-0 z-50 border-b border-surface-container-highest bg-surface/90 backdrop-blur-md transition-all duration-300 ${
           scrolled ? "py-1.5 shadow-card" : "py-3.5"
@@ -207,7 +204,7 @@ export default function Navbar() {
                       )}
 
                       <button
-                        onClick={handleLogout}
+                        onClick={() => void handleLogout()}
                         className="flex items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-sm text-red-600 transition-colors hover:bg-red-50"
                       >
                         <LogOut size={17} /> Se déconnecter

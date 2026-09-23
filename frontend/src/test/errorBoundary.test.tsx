@@ -11,11 +11,6 @@ function Fragile({ explose }: { explose: boolean }) {
   return <p>Contenu sain</p>;
 }
 
-/**
- * Sans frontière d'erreur, une exception de rendu démonte tout l'arbre React
- * et laisse une page blanche. Ces tests verrouillent le comportement inverse :
- * l'écran reste utilisable et l'utilisateur peut récupérer la main.
- */
 describe("ErrorBoundary", () => {
   beforeEach(() => {
     // React journalise l'erreur volontaire : on garde la sortie de test lisible.

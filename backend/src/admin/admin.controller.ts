@@ -11,7 +11,7 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { OrdersService } from '../orders/orders.service';
 import { PaymentsService } from '../payments/payments.service';
@@ -122,7 +122,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: ChangeRoleDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<UserResponseDto> {
     this.assertNotSelf(admin.id, id);
     const saved = await this.usersService.setRole(id, dto.role);
@@ -144,7 +144,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: SuspendUserDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<UserResponseDto> {
     this.assertNotSelf(admin.id, id);
     const saved = await this.usersService.setActive(id, false);
@@ -165,7 +165,7 @@ export class AdminController {
   async reactivate(
     @Param('id') id: string,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<UserResponseDto> {
     this.assertNotSelf(admin.id, id);
     const saved = await this.usersService.setActive(id, true);
@@ -199,7 +199,7 @@ export class AdminController {
   async approveSeller(
     @Param('id') id: string,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.sellersService.approve(id, admin.id, request);
   }
@@ -211,7 +211,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: RejectPaymentDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.sellersService.reject(id, admin.id, dto.reason, request);
   }
@@ -223,7 +223,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: SuspendUserDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.sellersService.suspend(
       id,
@@ -261,7 +261,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Order> {
     return this.ordersService.updateStatus(
       id,
@@ -286,7 +286,7 @@ export class AdminController {
   async verifyPayment(
     @Param('id') id: string,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.paymentsService.verify(id, admin.id, request);
   }
@@ -298,7 +298,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() dto: RejectPaymentDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.paymentsService.reject(id, admin.id, dto.reason, request);
   }

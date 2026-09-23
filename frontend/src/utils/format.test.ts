@@ -54,8 +54,8 @@ describe("toChartData", () => {
       { date: "2026-01-02T00:00:00Z", revenue: 2500 },
     ]);
     expect(data).toHaveLength(2);
-    expect(data[1]!.value).toBe(2500);
-    expect(typeof data[0]!.label).toBe("string");
+    expect(data[1].value).toBe(2500);
+    expect(typeof data[0].label).toBe("string");
   });
 
   it("tolère une liste vide", () => {

@@ -22,12 +22,6 @@ export function useOrderPayment(orderId: string | undefined, enabled = true) {
   });
 }
 
-/**
- * Soumission d'une référence Mobile Money.
- *
- * Le paiement reste `SUBMITTED` : aucune validation automatique n'est simulée
- * (§27). Seul un administrateur peut le passer à `VERIFIED`.
- */
 export function useSubmitPayment() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -41,9 +35,9 @@ export function useSubmitPayment() {
       input: SubmitPaymentInput;
     }) => paymentsApi.submitForOrder(orderId, input, crypto.randomUUID()),
     onSuccess: (payment) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments.forOrder(payment.orderId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(payment.orderId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.payments.forOrder(payment.orderId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(payment.orderId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast("Référence envoyée. Un administrateur vérifie votre paiement.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -67,10 +61,10 @@ export function useVerifyPayment() {
   return useMutation({
     mutationFn: (id: string) => paymentsApi.verify(id),
     onSuccess: (payment) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(payment.orderId) });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard("30d") });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(payment.orderId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard("30d") });
       toast("Paiement vérifié. La commande est passée au statut « Payée ».");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -85,9 +79,9 @@ export function useRejectPayment() {
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       paymentsApi.reject(id, reason),
     onSuccess: (payment) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(payment.orderId) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.payments.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(payment.orderId) });
       toast("Paiement rejeté.", "warning");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),

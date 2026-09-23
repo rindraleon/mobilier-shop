@@ -15,10 +15,6 @@ export function useWishlist() {
   });
 }
 
-/**
- * Bascule un favori avec mise à jour optimiste : l'icône réagit instantanément,
- * puis le serveur confirme. Un rollback automatique est prévu en cas d'échec.
- */
 export function useToggleWishlist() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -36,7 +32,7 @@ export function useToggleWishlist() {
       toast(added ? `${label} ajouté à vos favoris.` : `${label} retiré de vos favoris.`);
     },
     onError: (error: unknown) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.wishlist.all });
       toast(errorMessage(error), "error");
     },
   });

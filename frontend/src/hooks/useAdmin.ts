@@ -63,7 +63,7 @@ export function useChangeUserRole() {
     mutationFn: ({ id, role }: { id: string; role: UserRole }) =>
       adminApi.changeRole(id, role),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({}) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({}) });
       toast("Rôle modifié.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -78,7 +78,7 @@ export function useSuspendUser() {
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       adminApi.suspendUser(id, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({}) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({}) });
       toast("Compte suspendu.", "warning");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -92,7 +92,7 @@ export function useReactivateUser() {
   return useMutation({
     mutationFn: (id: string) => adminApi.reactivateUser(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({}) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.users({}) });
       toast("Compte réactivé.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -128,9 +128,9 @@ export function useApproveSeller() {
   return useMutation({
     mutationFn: (id: string) => adminApi.approveSeller(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellers });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.pendingSellers });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard("30d") });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.pendingSellers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.dashboard("30d") });
       toast("Vendeur approuvé. Il peut désormais publier ses produits.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -145,8 +145,8 @@ export function useRejectSeller() {
     mutationFn: ({ id, reason }: { id: string; reason: string }) =>
       adminApi.rejectSeller(id, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellers });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.pendingSellers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.pendingSellers });
       toast("Demande vendeur refusée.", "warning");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -161,7 +161,7 @@ export function useSuspendSeller() {
     mutationFn: ({ id, reason }: { id: string; reason?: string }) =>
       adminApi.suspendSeller(id, reason),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellers });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.sellers });
       toast("Boutique suspendue.", "warning");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -196,8 +196,8 @@ export function useCreateCategory() {
   return useMutation({
     mutationFn: (input: CreateCategoryInput) => categoriesApi.create(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
-      queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
       toast("Catégorie créée.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -212,8 +212,8 @@ export function useUpdateCategory() {
     mutationFn: ({ id, input }: { id: string; input: Partial<CreateCategoryInput> }) =>
       categoriesApi.update(id, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
-      queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
       toast("Catégorie mise à jour.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -227,8 +227,8 @@ export function useDeleteCategory() {
   return useMutation({
     mutationFn: (id: string) => categoriesApi.remove(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
-      queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.categories });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
       toast("Catégorie supprimée.", "info");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -262,8 +262,8 @@ export function useAdminUpdateOrderStatus() {
       comment?: string;
     }) => adminApi.updateOrderStatus(id, status, comment),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.admin.orders({}) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.admin.orders({}) });
       toast("Statut de la commande mis à jour.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),

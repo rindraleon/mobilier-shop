@@ -2,11 +2,6 @@ import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
 
-/**
- * Client Redis optionnel : l'API démarre et fonctionne sans Redis.
- * Toutes les méthodes dégradent proprement (return null / false) en cas
- * d'indisponibilité, jamais d'exception bloquante pour l'utilisateur.
- */
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private readonly logger = new Logger(RedisService.name);

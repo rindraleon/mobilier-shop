@@ -1,10 +1,6 @@
 import { MobileMoneyProvider } from '../../common/enums';
 
 export interface ReferenceCheckResult {
-  /**
-   * false = aucune API officielle branchée : la vérification reste MANUELLE
-   * par un administrateur. On ne simule JAMAIS une validation automatique.
-   */
   automatic: boolean;
   verified?: boolean;
   reference?: string;

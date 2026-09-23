@@ -32,6 +32,24 @@ export interface CreateNotificationInput {
   email?: { to: string; subject: string; html: string };
 }
 
+/** Lignes brutes des requêtes de notification : le pilote pg ne type pas le résultat. */
+interface SellerOwnerRow {
+  id: string;
+  shopName: string;
+  email: string;
+  firstName: string;
+}
+interface SellerContactRow {
+  shopName: string;
+  email: string;
+}
+interface AdminRow {
+  id: string;
+}
+interface SellerUserIdRow {
+  userId: string;
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
@@ -67,10 +85,6 @@ export class NotificationsService {
     return saved;
   }
 
-  /**
-   * Notifie CHAQUE vendeur concerné par une commande,
-   * uniquement pour ses propres articles.
-   */
   async notifyOrderCreated(order: Order, items: OrderItem[]): Promise<void> {
     const frontendUrl = this.config.get<string>('frontendUrl') ?? '';
     const bySeller = new Map<string, OrderItem[]>();
@@ -82,14 +96,13 @@ export class NotificationsService {
 
     for (const [sellerId, sellerItems] of bySeller) {
       const sellerAmount = sellerItems.reduce((sum, item) => sum + item.lineTotal, 0);
-      const owner = await this.dataSource.query(
+      const owner = await this.dataSource.query<SellerOwnerRow[]>(
         `SELECT s.id, s."shop_name" AS "shopName", u.email, u."first_name" AS "firstName"
            FROM sellers s JOIN users u ON u.id = s."user_id"
           WHERE s.id = $1`,
         [sellerId],
       );
-      const row = owner?.[0] as
-        { id: string; shopName: string; email: string; firstName: string } | undefined;
+      const row = owner?.[0];
       if (!row) continue;
 
       const mail = orderCreatedSellerTemplate({
@@ -246,13 +259,13 @@ export class NotificationsService {
     const userId = await this.userIdForSeller(sellerId);
     if (!userId) return;
 
-    const owner = await this.dataSource.query(
+    const owner = await this.dataSource.query<SellerContactRow[]>(
       `SELECT s."shop_name" AS "shopName", u.email
          FROM sellers s JOIN users u ON u.id = s."user_id"
         WHERE s.id = $1`,
       [sellerId],
     );
-    const row = owner?.[0] as { shopName: string; email: string } | undefined;
+    const row = owner?.[0];
     if (!row) return;
 
     const mail = lowStockTemplate(row.email, row.shopName, [
@@ -302,7 +315,7 @@ export class NotificationsService {
 
   async markAsRead(userId: string, id: string): Promise<Notification> {
     const notification = await this.notifications.findOne({ where: { id } });
-    if (!notification || notification.userId !== userId) {
+    if (notification?.userId !== userId) {
       throw new Error('NOTIFICATION_NOT_FOUND');
     }
     notification.readAt = new Date();
@@ -321,17 +334,17 @@ export class NotificationsService {
   }
 
   async adminIds(): Promise<string[]> {
-    const rows = await this.dataSource.query(
+    const rows = await this.dataSource.query<AdminRow[]>(
       `SELECT id FROM users WHERE role = 'admin' AND "is_active" = true AND "deleted_at" IS NULL`,
     );
-    return (rows as { id: string }[]).map((row) => row.id);
+    return rows.map((row) => row.id);
   }
 
   private async userIdForSeller(sellerId: string): Promise<string> {
-    const rows = await this.dataSource.query(
+    const rows = await this.dataSource.query<SellerUserIdRow[]>(
       'SELECT "user_id" AS "userId" FROM sellers WHERE id = $1',
       [sellerId],
     );
-    return (rows?.[0] as { userId: string } | undefined)?.userId ?? '';
+    return rows?.[0]?.userId ?? '';
   }
 }

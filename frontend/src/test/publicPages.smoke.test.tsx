@@ -11,14 +11,6 @@ import BlogPost from "../pages/public/BlogPost";
 import Contact from "../pages/public/Contact";
 import NotFound from "../pages/public/NotFound";
 
-/**
- * Test de fumée des pages publiques « orphelines ».
- *
- * Ces six écrans consomment surtout des données éditoriales locales
- * (`data/collections.ts`, `data/blog.ts`) et n'avaient jamais été montés par
- * un test depuis la migration de l'API : ils compilaient sans garantie de
- * s'afficher. On vérifie ici qu'ils se montent et rendent leur contenu.
- */
 function mount(ui: React.ReactNode, route = "/") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },

@@ -36,12 +36,8 @@ export default function OrderSuccess() {
   const { data: order, isLoading, isError, refetch } = useOrder(id);
   const { data: payment } = useOrderPayment(id);
   const submitPayment = useSubmitPayment();
-  // La liste des opérateurs activés vient de l'API (`GET /payments/providers`) :
-  // c'est le serveur qui fait foi, les constantes locales ne fournissent que
-  // l'habillage (format de référence, couleur, initiales).
   const { data: serverProviders } = usePaymentProviders();
   const [provider, setProvider] = useState<MobileMoneyProvider>("mvola");
-
 
   const form = useForm<PaymentFormInput>({
     resolver: zodResolver(paymentSchema),
@@ -60,13 +56,10 @@ export default function OrderSuccess() {
         );
   }, [serverProviders]);
 
-  // Si l'opérateur par défaut n'est pas (ou plus) activé côté serveur, on
-  // sélectionne le premier disponible pour ne jamais soumettre un opérateur
-  // désactivé.
   useEffect(() => {
     if (!operatorCards.length) return;
     if (operatorCards.some((p) => p.id === provider)) return;
-    const first = operatorCards[0]!.id;
+    const first = operatorCards[0].id;
     setProvider(first);
     form.setValue("provider", first);
   }, [operatorCards, provider, form]);
@@ -263,7 +256,7 @@ export default function OrderSuccess() {
             )}
 
             {canSubmit && (
-              <form onSubmit={onSubmit} className="mt-5 space-y-4" noValidate>
+              <form onSubmit={(event) => void onSubmit(event)} className="mt-5 space-y-4" noValidate>
                 <div className="grid gap-3 sm:grid-cols-3">
                   {operatorCards.map((p) => (
                     <button

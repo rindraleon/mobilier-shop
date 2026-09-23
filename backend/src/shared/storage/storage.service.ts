@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
-import * as path from 'path';
+import * as crypto from 'node:crypto';
+import * as path from 'node:path';
 import * as Minio from 'minio';
 import { StorageBucket } from '../../common/enums';
 import { BusinessException } from '../../common/errors/business.exception';
@@ -122,10 +122,6 @@ export class StorageService {
     }
   }
 
-  /**
-   * L'objectKey est généré côté serveur (bucket/année/mois/uuid.ext).
-   * Le nom d'origine n'est jamais réutilisé tel quel : pas de traversal possible.
-   */
   buildObjectKey(bucket: string, file: UploadedFileLike): string {
     const extension = this.extensionFor(file);
     const now = new Date();

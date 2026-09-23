@@ -1,26 +1,11 @@
-/**
- * Client HTTP centralisé (§51).
- *
- * Exigences couvertes :
- *  - **un seul** point d'appel réseau : aucun `fetch()` ailleurs dans le projet ;
- *  - access token **en mémoire** (jamais dans `localStorage`) ;
- *  - refresh token conservé en mémoire + cookie httpOnly posé par le backend ;
- *  - rafraîchissement automatique et **single-flight** (une seule requête de
- *    refresh même si 10 appels échouent simultanément en 401) ;
- *  - timeout, erreurs typées, annulation.
- *
- * Sécurité (§50) : aucun secret n'est écrit dans `localStorage`/`sessionStorage`.
- * Un rechargement de page rejoue un « silent refresh » via le cookie httpOnly.
- * Si le navigateur refuse le cookie, l'utilisateur est simplement déconnecté —
- * comportement sûr par défaut.
- */
+
 
 import type { ApiErrorBody, AuthResponse } from "../../types/api";
 
 /** Timeout réseau par défaut (ms). */
 const DEFAULT_TIMEOUT = 20_000;
 
-const API_BASE_URL: string = import.meta.env.VITE_API_URL ?? "/api";
+const API_BASE_URL: string = (import.meta.env.VITE_API_URL as string | undefined) ?? "/api";
 
 /* ------------------------------------------------------------------ */
 /* Erreur typée                                                        */
@@ -177,14 +162,27 @@ export function buildQuery(params: object = {}): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null || value === "") return;
-    if (typeof value === "boolean") {
-      search.set(key, value ? "true" : "false");
+    if (Array.isArray(value)) {
+      value.forEach((entry) => {
+        if (entry !== undefined && entry !== null && entry !== "") {
+          search.append(key, serializeParam(entry));
+        }
+      });
       return;
     }
-    search.set(key, String(value));
+    search.set(key, serializeParam(value));
   });
   const qs = search.toString();
   return qs ? `?${qs}` : "";
+}
+
+// Sans ce garde-fou, un objet passé en paramètre deviendrait « [object Object] » dans l'URL.
+// On le sérialise donc en JSON, ce qui reste lisible et réversible côté API.
+function serializeParam(value: unknown): string {
+  if (typeof value === "boolean") return value ? "true" : "false";
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "object" && value !== null) return JSON.stringify(value);
+  return String(value);
 }
 
 export interface RequestOptions extends Omit<RequestInit, "body"> {
@@ -215,10 +213,6 @@ async function parseBody(response: Response): Promise<unknown> {
   }
 }
 
-/**
- * Appel API typé. Lève `ApiError` pour toute réponse en erreur,
- * `NetworkError` si le serveur est injoignable ou la requête expirée.
- */
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const {
     json,

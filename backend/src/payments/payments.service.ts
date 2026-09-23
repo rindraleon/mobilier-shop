@@ -36,10 +36,6 @@ export class PaymentsService {
     private readonly idempotency: IdempotencyService,
   ) {}
 
-  /**
-   * Le client soumet la référence de sa transaction Mobile Money.
-   * RIEN n'est validé automatiquement : un administrateur doit vérifier.
-   */
   async submit(
     userId: string,
     orderId: string,

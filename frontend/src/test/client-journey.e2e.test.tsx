@@ -15,40 +15,8 @@ import {
   type LiveFetchHandle,
 } from "./liveApi";
 
-/**
- * Évaluation QA — parcours d'achat complet **saisi par le client**.
- *
- * Aucune étape n'est pré-remplie : l'utilisateur tape lui-même, dans
- * l'interface, chacune des données :
- *
- *   1. connexion (e-mail + mot de passe) ;
- *   2. choix d'un produit dans la boutique ;
- *   3. ajout au panier ;
- *   4. saisie de l'adresse de livraison ;
- *   5. validation de la commande ;
- *   6. saisie de la référence Mobile Money ;
- *   7. soumission de la référence.
- *
- * Le réseau n'est pas simulé : l'application dialogue avec le backend réel
- * (`installLiveFetch` préfixe les URLs relatives et gère les cookies).
- *
- * Seules deux actions relèvent de la préparation du jeu d'essai (panier vidé
- * au départ) ; elles passent par l'API, jamais par l'interface.
- *
- * Le test est ignoré automatiquement si aucun backend ne répond.
- */
-
 const apiUp = await isApiUp();
 
-/**
- * Navigation dans l'application.
- *
- * jsdom n'implémente pas la navigation par clic sur `<a href>` : les liens ne
- * déclenchent pas de changement de page. On pilote donc le routeur
- * (`popstate`, seule API d' historique écoutée par React Router) pour les
- * changements d'écran, tandis que **tous les boutons restent cliqués pour de
- * vrai** et toutes les saisies sont tapées au clavier.
- */
 function go(path: string): void {
   act(() => {
     window.history.pushState({}, "", path);
@@ -146,9 +114,6 @@ describe.skipIf(!apiUp)("Parcours client complet — tout saisi dans l'UI", () =
       );
 
       /* ---------- Étape 2 : le client choisit un produit ---------- */
-      // On écarte les produits épuisés (le stock a été consommé par les
-      // exécutions précédentes) : le client doit cliquer sur un article
-      // réellement disponible, sinon le bouton affiche « Indisponible ».
       const catalogue = (await (
         await fetch(`${API_ORIGIN}/api/products?limit=50`)
       ).json()) as { items: Array<{ slug: string; stock: number }> };

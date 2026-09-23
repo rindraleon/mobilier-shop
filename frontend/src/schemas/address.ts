@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-/**
- * Adresse de livraison.
- * Champs alignés sur `AddressDto` / `OrderAddressInputDto` du backend.
- */
 export const addressSchema = z.object({
   label: z.string().trim().max(60).optional().or(z.literal("")),
   fullName: z.string().trim().min(1, "Le nom du destinataire est requis.").max(160),

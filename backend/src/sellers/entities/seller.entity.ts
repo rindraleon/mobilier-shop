@@ -12,10 +12,6 @@ import {
 import { SellerStatus } from '../../common/enums';
 import { User } from '../../users/entities/user.entity';
 
-/**
- * Profil vendeur. Une demande d'inscription crée une ligne PENDING :
- * personne ne peut publier de produit tant que le statut n'est pas APPROVED.
- */
 @Entity('sellers')
 @Index('idx_sellers_user', ['userId'], { unique: true })
 @Index('idx_sellers_slug', ['slug'], { unique: true })

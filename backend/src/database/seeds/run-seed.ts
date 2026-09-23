@@ -1,7 +1,3 @@
-/**
- * Exécution du seed de développement :
- *   npm run seed
- */
 import { AppDataSource } from '../data-source';
 import { runSeed, SEED_PASSWORD } from './initial.seed';
 

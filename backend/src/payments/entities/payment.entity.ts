@@ -12,11 +12,6 @@ import { MobileMoneyProvider, PaymentStatus } from '../../common/enums';
 import { User } from '../../users/entities/user.entity';
 import { Order } from '../../orders/entities/order.entity';
 
-/**
- * Paiement Mobile Money (flux manuel par référence de transaction).
- * Une référence ne peut pas être réutilisée pour un autre paiement vérifié :
- * contrainte unique partielle (provider, transactionReference) sur les statuts actifs.
- */
 @Entity('payments')
 @Index('idx_payments_order', ['orderId'])
 @Index('idx_payments_status', ['status'])

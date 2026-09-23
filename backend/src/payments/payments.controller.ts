@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Headers, Param, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
+import { requireUser } from '../common/utils/request.util';
 import { PaymentsService } from './payments.service';
 import { CurrentUser, type JwtUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -31,7 +32,7 @@ export class PaymentsController {
     summary: 'Opérateurs Mobile Money disponibles',
     description: 'La vérification est manuelle tant qu’aucune API officielle n’est branchée.',
   })
-  async providers() {
+  providers() {
     return this.paymentsService.providers();
   }
 
@@ -48,7 +49,7 @@ export class PaymentsController {
     @CurrentUser() user: JwtUser,
     @Param('orderId') orderId: string,
     @Body() dto: SubmitPaymentDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<Payment> {
     return this.paymentsService.submit(user.id, orderId, dto, { idempotencyKey, request });
@@ -58,9 +59,9 @@ export class PaymentsController {
   @ApiOperation({ summary: 'Paiement d’une de mes commandes' })
   async findForOrder(
     @Param('orderId') orderId: string,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Payment | null> {
-    const user = request.user as JwtUser;
+    const user = requireUser(request);
     if (user.role !== UserRole.ADMIN) {
       const order = await this.ordersService.findByIdRaw(orderId);
       if (order.userId !== user.id) {
@@ -92,7 +93,7 @@ export class PaymentsController {
   async verify(
     @Param('id') id: string,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Payment> {
     return this.paymentsService.verify(id, admin.id, request);
   }
@@ -108,7 +109,7 @@ export class PaymentsController {
     @Param('id') id: string,
     @Body() dto: RejectPaymentDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Payment> {
     return this.paymentsService.reject(id, admin.id, dto.reason, request);
   }

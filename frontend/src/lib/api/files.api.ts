@@ -18,10 +18,7 @@ export interface UploadRulesResponse {
 export const filesApi = {
   rules: () => api.get<UploadRulesResponse>("/files/rules"),
 
-  /**
-   * Upload un fichier vers MinIO. Le backend valide taille, MIME, extension
-   * et génère la clé objet : aucune influence du client sur le chemin (§19).
-   */
+  
   upload: (bucket: UploadBucket, file: File) => {
     const form = new FormData();
     form.append("bucket", bucket);

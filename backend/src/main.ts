@@ -199,15 +199,6 @@ async function bootstrap(): Promise<void> {
   );
 }
 
-/**
- * Schéma absent : le dire au démarrage plutôt qu'en 500.
- *
- * Sans ce contrôle, un développeur qui clone le projet et lance l'API sans
- * exécuter les migrations obtient, sur la première requête, une erreur
- * incompréhensible (`relation « users » does not exist`) qui ne mentionne ni
- * la migration ni la commande à lancer. On la détecte ici et on l'annonce
- * explicitement.
- */
 async function warnIfSchemaMissing(app: INestApplication): Promise<void> {
   try {
     const dataSource = app.get(DataSource, { strict: false });

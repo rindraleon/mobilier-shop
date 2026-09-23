@@ -32,8 +32,8 @@ export function useApplySeller() {
   return useMutation({
     mutationFn: sellersApi.apply,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.sellerApplication });
-      queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sellerApplication });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
       toast("Demande envoyée. Un administrateur va l'examiner.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -59,9 +59,9 @@ export function useCreateProduct() {
   return useMutation({
     mutationFn: (input: CreateProductInput) => productsApi.create(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.seller.dashboard });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seller.dashboard });
       toast("Produit créé.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -76,8 +76,8 @@ export function useUpdateProduct() {
     mutationFn: ({ id, input }: { id: string; input: UpdateProductInput }) =>
       productsApi.update(id, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
       toast("Produit mis à jour.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -91,9 +91,9 @@ export function useDeleteProduct() {
   return useMutation({
     mutationFn: (id: string) => productsApi.remove(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.seller.dashboard });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seller.dashboard });
       toast("Produit supprimé.", "info");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),

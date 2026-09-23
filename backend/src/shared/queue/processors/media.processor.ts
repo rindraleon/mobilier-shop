@@ -9,10 +9,6 @@ export interface MediaJobData {
   action: 'delete' | 'thumbnail';
 }
 
-/**
- * Worker média : suppression différée d'objets et futurs traitements d'image.
- * Les tâches lourdes (redimensionnement, watermark) viendront ici.
- */
 @Processor(QUEUE_NAMES.MEDIA)
 export class MediaProcessor extends WorkerHost implements OnModuleDestroy {
   private readonly logger = new Logger(MediaProcessor.name);

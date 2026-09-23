@@ -1,10 +1,4 @@
-/**
- * Registre central des clés TanStack Query (§7).
- *
- * Une clé = une ressource serveur. Les regrouper ici permet d'invalider
- * proprement après une mutation (`invalidateQueries({ queryKey: queryKeys.orders.all })`)
- * sans jamais retaper un tableau de chaînes à la main.
- */
+
 export const queryKeys = {
   /* --- Session --- */
   me: ["auth", "me"] as const,

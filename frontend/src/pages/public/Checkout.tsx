@@ -19,7 +19,7 @@ import Button from "../../components/ui/Button";
 import { Checkbox, Field, Input } from "../../components/ui/Form";
 import PageLoader from "../../components/ui/PageLoader";
 import EmptyState from "../../components/ui/EmptyState";
-import type { ShippingMethod } from "../../types/api";
+import type { CreateOrderInput, ShippingMethod } from "../../types/api";
 
 const steps = [
   { label: "Panier", done: true },
@@ -53,7 +53,7 @@ export default function Checkout() {
   const subtotal = cart?.subtotal ?? 0;
 
   const selected = useMemo(
-    () => SHIPPING_METHODS.find((m) => m.id === shippingMethod) ?? SHIPPING_METHODS[0]!,
+    () => SHIPPING_METHODS.find((m) => m.id === shippingMethod) ?? SHIPPING_METHODS[0],
     [shippingMethod],
   );
 
@@ -78,52 +78,59 @@ export default function Checkout() {
     );
   }
 
-  const onSubmit = addressForm.handleSubmit(async (values) => {
-    try {
-      let resolvedAddressId: string | undefined;
+  const onPlaceOrder = async (input: CreateOrderInput): Promise<void> => {
+    const order = await createOrder.mutateAsync(input);
+    navigate("/commande/succes/" + order.id, { replace: true });
+  };
 
-      if (addressId !== "new") {
-        resolvedAddressId = addressId;
-      } else {
-        // Adresse ponctuelle : éventuellement enregistrée dans le carnet.
-        const orderAddress = {
-          fullName: values.fullName,
-          phone: values.phone,
-          addressLine1: values.addressLine1,
-          addressLine2: values.addressLine2 || undefined,
-          postalCode: values.postalCode || undefined,
-          city: values.city,
-          country: values.country || "Madagascar",
-        };
+  const onSubmitNewAddress = async (values: AddressFormInput): Promise<void> => {
+    // Adresse ponctuelle : éventuellement enregistrée dans le carnet.
+    const orderAddress = {
+      fullName: values.fullName,
+      phone: values.phone,
+      addressLine1: values.addressLine1,
+      addressLine2: values.addressLine2 || undefined,
+      postalCode: values.postalCode || undefined,
+      city: values.city,
+      country: values.country || "Madagascar",
+    };
 
-        if (saveNewAddress) {
-          const saved = await saveAddress.mutateAsync({
-            ...orderAddress,
-            label: values.label || "Adresse de livraison",
-            isDefault: addresses.length === 0,
-          });
-          resolvedAddressId = saved.id;
-        }
-
-        const order = await createOrder.mutateAsync({
-          shippingAddress: orderAddress,
-          shippingMethod,
-          saveAddress: saveNewAddress,
-          addressLabel: values.label || undefined,
-        });
-        navigate("/commande/succes/" + order.id, { replace: true });
-        return;
-      }
-
-      const order = await createOrder.mutateAsync({
-        addressId: resolvedAddressId,
-        shippingMethod,
+    if (saveNewAddress) {
+      await saveAddress.mutateAsync({
+        ...orderAddress,
+        label: values.label || "Adresse de livraison",
+        isDefault: addresses.length === 0,
       });
-      navigate("/commande/succes/" + order.id, { replace: true });
-    } catch (error) {
-      toast(errorMessage(error), "error");
     }
-  });
+
+    await onPlaceOrder({
+      shippingAddress: orderAddress,
+      shippingMethod,
+      saveAddress: saveNewAddress,
+      addressLabel: values.label || undefined,
+    });
+  };
+
+  // La validation react-hook-form ne s'applique qu'au formulaire d'adresse
+  // ponctuelle : si le client choisit une adresse enregistrée, il n'y a aucun
+  // champ à saisir. Sans cette distinction, les champs invisibles (vides)
+  // échoueraient la validation et bloqueraient la soumission de la commande.
+  const onSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
+    if (addressId === "new") {
+      void addressForm.handleSubmit(async (values) => {
+        try {
+          await onSubmitNewAddress(values);
+        } catch (error) {
+          toast(errorMessage(error), "error");
+        }
+      })(event);
+      return;
+    }
+    event.preventDefault();
+    void onPlaceOrder({ addressId, shippingMethod }).catch((error) =>
+      toast(errorMessage(error), "error"),
+    );
+  };
 
   return (
     <div className="container-app py-8 lg:py-12">

@@ -1,9 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-/**
- * Protection contre les doubles soumissions (création de commande, paiement).
- * La clé est fournie par le client dans l'en-tête `Idempotency-Key`.
- */
 @Entity('idempotency_keys')
 @Index('idx_idempotency_unique', ['scope', 'key'], { unique: true })
 export class IdempotencyKey {

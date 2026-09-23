@@ -10,10 +10,6 @@ export function slugify(value: string): string {
   });
 }
 
-/**
- * Garantit un slug unique en ajoutant un suffixe numérique.
- * `exists` doit tester l'unicité en base.
- */
 export async function uniqueSlug(
   base: string,
   exists: (slug: string) => Promise<boolean>,

@@ -3,7 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { UserRole } from '../enums';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
-import type { JwtUser } from '../decorators/current-user.decorator';
+import type { AuthenticatedRequest } from '../interfaces/authenticated-request.interface';
 
 /** Vérifie le rôle présent dans le JWT (signé côté serveur). */
 @Injectable()
@@ -23,10 +23,10 @@ export class RolesGuard implements CanActivate {
     ]);
     if (!requiredRoles || requiredRoles.length === 0) return true;
 
-    const request = context.switchToHttp().getRequest();
-    const user = request.user as JwtUser | undefined;
+    const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
+    const user = request.user;
     if (!user) return false;
 
-    return requiredRoles.includes(user.role as UserRole);
+    return requiredRoles.includes(user.role);
   }
 }

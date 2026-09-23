@@ -109,7 +109,7 @@ export default function BecomeSeller() {
               administrateur avant activation.
             </p>
 
-            <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+            <form onSubmit={(event) => void onSubmit(event)} className="mt-6 space-y-4" noValidate>
               <Field label="Nom de la boutique" required error={form.formState.errors.shopName?.message}>
                 <Input placeholder="Atelier Rindra" {...form.register("shopName")} />
               </Field>

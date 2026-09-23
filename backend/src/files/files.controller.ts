@@ -21,15 +21,16 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 import { StorageService, type UploadedFileLike } from '../shared/storage/storage.service';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CurrentUser, type JwtUser } from '../common/decorators/current-user.decorator';
-import { StorageBucket, UserRole , AuditAction, AuditEntity } from '../common/enums';
+import { StorageBucket, UserRole } from '../common/enums';
 import { BusinessException } from '../common/errors/business.exception';
 import { ErrorCode } from '../common/errors/error-codes';
 import { DeleteFileDto, UploadedFileResponseDto, UPLOAD_RULES } from './dto/file.dto';
 import { AuditService } from '../audit/audit.service';
+import { AuditAction, AuditEntity } from '../common/enums';
 
 @ApiTags('files')
 @ApiBearerAuth('access-token')
@@ -69,7 +70,7 @@ export class FilesController {
     @CurrentUser() user: JwtUser,
     @UploadedFile() file: UploadedFileLike | undefined,
     @Query('bucket', new ParseEnumPipe(StorageBucket)) bucket: StorageBucket,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<UploadedFileResponseDto> {
     if (!file) {
       throw BusinessException.badRequest('Aucun fichier reçu.', ErrorCode.VALIDATION_ERROR);
@@ -110,7 +111,7 @@ export class FilesController {
   async remove(
     @Body() dto: DeleteFileDto,
     @CurrentUser() admin: JwtUser,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<void> {
     await this.storage.delete(dto.bucket, dto.objectKey);
     await this.audit.log({

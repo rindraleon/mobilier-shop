@@ -178,13 +178,13 @@ export default function AdminCategories() {
             <Button variant="outline" onClick={() => setOpen(false)}>
               Annuler
             </Button>
-            <Button onClick={onSubmit} disabled={create.isPending || update.isPending}>
+            <Button onClick={() => void onSubmit()} disabled={create.isPending || update.isPending}>
               {create.isPending || update.isPending ? "Enregistrement…" : "Enregistrer"}
             </Button>
           </>
         }
       >
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
+        <form onSubmit={(event) => void onSubmit(event)} className="space-y-4" noValidate>
           <Field label="Nom" required error={form.formState.errors.name?.message}>
             <Input {...form.register("name")} />
           </Field>

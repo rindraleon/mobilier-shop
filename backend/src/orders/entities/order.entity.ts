@@ -25,11 +25,6 @@ export interface OrderAddressSnapshot {
   country: string;
 }
 
-/**
- * Commande marketplace. Peut contenir des articles de plusieurs vendeurs :
- * chaque OrderItem porte son propre `sellerId`.
- * Les montants sont figés à la commande (prix unitaire copié).
- */
 @Entity('orders')
 @Index('idx_orders_user', ['userId'])
 @Index('idx_orders_status', ['status'])
@@ -109,14 +104,6 @@ export class Order {
   @OneToMany(() => OrderStatusHistory, (history) => history.order, { cascade: true })
   statusHistory!: OrderStatusHistory[];
 
-  /**
-   * Dernier paiement connu de la commande.
-   *
-   * Propriété **non persistée** (aucune décoration TypeORM) : elle est chargée
-   * explicitement par `OrdersService.findOne()` afin d'exposer le paiement sans
-   * introduire de colonne ni de nouvelle migration. On reste ainsi cohérent avec
-   * `OrderResponseDto.payment` tout en gardant le schéma versionné intact.
-   */
   payment?: Payment | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

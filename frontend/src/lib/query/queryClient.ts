@@ -1,15 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { ApiError, NetworkError } from "../api/client";
 
-/**
- * Configuration globale de TanStack Query (§7).
- *
- * - `staleTime` : les données de catalogue restent fraîches 60 s (peu volatiles).
- * - `gcTime` : 15 min de cache après démontage des composants.
- * - `retry` : on ne réessaie **jamais** une erreur métier (4xx). Réessayer un
- *   403 ou un 422 ne peut pas réussir et ferait paraître l'UI bloquée. En
- *   revanche une panne réseau ou un 5xx mérite une seconde chance.
- */
 export function createQueryClient(): QueryClient {
   return new QueryClient({
     defaultOptions: {

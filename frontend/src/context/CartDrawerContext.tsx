@@ -1,13 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-/**
- * État d'UI **pur** du tiroir panier (§82).
- *
- * L'ancien `CartContext` mélangeait les données du panier et son ouverture.
- * Les données vivent désormais sur le serveur (TanStack Query) ; il ne reste
- * ici que l'état d'affichage, qui n'a aucune raison d'être persisté.
- */
 interface CartDrawerContextValue {
   isOpen: boolean;
   openCart: () => void;
@@ -17,7 +10,7 @@ interface CartDrawerContextValue {
 
 const CartDrawerContext = createContext<CartDrawerContextValue | null>(null);
 
-export function CartDrawerProvider({ children }: { children: ReactNode }) {
+export function CartDrawerProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
   const openCart = useCallback(() => setIsOpen(true), []);

@@ -14,7 +14,7 @@ interface ProductCardProps {
   wishlisted?: boolean;
 }
 
-export default function ProductCard({ product, wishlisted = false }: ProductCardProps) {
+export default function ProductCard({ product, wishlisted = false }: Readonly<ProductCardProps>) {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
   const addItem = useAddCartItem();

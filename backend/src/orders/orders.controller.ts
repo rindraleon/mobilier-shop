@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Headers, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { ApiBearerAuth, ApiHeader, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
+import { requireUser } from '../common/utils/request.util';
 import { OrdersService, type ActorContext } from './orders.service';
 import { CurrentUser, type JwtUser } from '../common/decorators/current-user.decorator';
-import { UserRole } from '../common/enums';
 import {
   CancelOrderDto,
   CreateOrderDto,
@@ -37,7 +37,7 @@ export class OrdersController {
   async create(
     @CurrentUser() user: JwtUser,
     @Body() dto: CreateOrderDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
     @Headers('idempotency-key') idempotencyKey?: string,
   ): Promise<Order> {
     return this.ordersService.create(user.id, dto, { idempotencyKey, request });
@@ -60,11 +60,11 @@ export class OrdersController {
   })
   @ApiResponse({ status: 200, type: OrderResponseDto })
   @ApiResponse({ status: 403, description: 'Cette commande ne vous appartient pas.' })
-  async findOne(@Param('id') id: string, @Req() request: Request): Promise<Order> {
-    const user = request.user as JwtUser;
+  async findOne(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<Order> {
+    const user = requireUser(request);
     const actor: ActorContext = {
       userId: user.id,
-      role: user.role as UserRole,
+      role: user.role,
       sellerId: request.seller?.id ?? user.sellerId ?? null,
     };
     return this.ordersService.findOne(id, actor);
@@ -77,12 +77,12 @@ export class OrdersController {
   async cancel(
     @Param('id') id: string,
     @Body() dto: CancelOrderDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Order> {
-    const user = request.user as JwtUser;
+    const user = requireUser(request);
     const actor: ActorContext = {
       userId: user.id,
-      role: user.role as UserRole,
+      role: user.role,
       sellerId: request.seller?.id ?? user.sellerId ?? null,
     };
     return this.ordersService.cancel(id, actor, dto, request);
@@ -99,12 +99,12 @@ export class OrdersController {
   async updateStatus(
     @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Order> {
-    const user = request.user as JwtUser;
+    const user = requireUser(request);
     const actor: ActorContext = {
       userId: user.id,
-      role: user.role as UserRole,
+      role: user.role,
       sellerId: request.seller?.id ?? user.sellerId ?? null,
     };
     return this.ordersService.updateStatus(id, dto.status, actor, dto.comment ?? null, request);

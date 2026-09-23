@@ -9,11 +9,6 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
-/**
- * Refresh token opaque : seul le SHA-256 du jeton est stocké.
- * La rotation remplace un jeton par un nouveau (`replacedById`),
- * ce qui permet de détecter la réutilisation (vol) et de révoquer la famille.
- */
 @Entity('refresh_tokens')
 @Index('idx_refresh_tokens_user', ['userId'])
 @Index('idx_refresh_tokens_hash', ['tokenHash'], { unique: true })

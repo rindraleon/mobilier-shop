@@ -1,9 +1,3 @@
-/**
- * Rôles utilisateur.
- *
- * ATTENTION : le rôle SELLER seul ne suffit jamais à autoriser la vente.
- * Il faut également que le vendeur soit APPROVED (voir SellerStatus).
- */
 export enum UserRole {
   CUSTOMER = 'customer',
   SELLER = 'seller',

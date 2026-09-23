@@ -41,13 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isBooting, setIsBooting] = useState<boolean>(true);
   const queryClient = useQueryClient();
 
-  /**
-   * Restauration de session au démarrage (§50).
-   *
-   * On rejoue un « silent refresh » : si le cookie httpOnly de refresh est
-   * encore valide, le backend renvoie un nouvel access token. Aucun secret
-   * n'est donc stocké dans `localStorage`.
-   */
+  
   useEffect(() => {
     let cancelled = false;
 
@@ -72,10 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  /**
-   * Si un 401 définitif survient ailleurs (refresh impossible), le client HTTP
-   * prévient : on repasse anonyme et on purge le cache des données privées.
-   */
+  
   useEffect(
     () =>
       onSessionChange((token) => {

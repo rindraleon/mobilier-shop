@@ -3,13 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { QUEUE_NAMES, type QueueName } from './queue.constants';
 
-/**
- * Producteur de jobs BullMQ.
- *
- * Deux règles importantes :
- *  - l'ajout d'un job ne doit JAMAIS bloquer ni faire échouer une requête HTTP ;
- *  - si Redis est indisponible, on dégrade silencieusement (log + abandon).
- */
 @Injectable()
 export class QueueService {
   private readonly logger = new Logger(QueueService.name);

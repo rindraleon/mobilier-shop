@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, MapPin, Package } from "lucide-react";
 import { useAdminOrders, useAdminUpdateOrderStatus } from "../../hooks/useAdmin";
-import { ORDER_STATUS } from "../../utils/constants";
+import { ADMIN_ORDER_TRANSITIONS, ORDER_STATUS } from "../../utils/constants";
 import { formatDate, formatPrice } from "../../utils/format";
 import { errorMessage } from "../../utils/errors";
 import { useToast } from "../../context/ToastContext";
@@ -23,6 +23,9 @@ export default function AdminOrderDetail() {
   const [comment, setComment] = useState<string>("");
 
   const order = id ? list?.items.find((o) => o.id === id) : undefined;
+  const nextStatusOptions: OrderStatus[] = order
+    ? (ADMIN_ORDER_TRANSITIONS[order.status] ?? [])
+    : [];
 
   if (isLoading) {
     return (
@@ -161,21 +164,38 @@ export default function AdminOrderDetail() {
           <section className="card p-5">
             <h2 className="font-display text-headline-sm text-primary">Changer le statut</h2>
             <div className="mt-3 space-y-3">
-              <Field label="Nouveau statut">
-                <Select
-                  value={nextStatus}
-                  onChange={(e) => setNextStatus(e.target.value as OrderStatus)}
-                >
-                  <option value="">Choisir…</option>
-                  {Object.entries(ORDER_STATUS)
-                    .filter(([value]) => value !== order.status)
-                    .map(([value, meta]) => (
+              {(order.status === "pending_payment" || order.status === "payment_submitted") && (
+                <p className="rounded-lg bg-surface-container-low p-3 text-label-sm text-on-surface-variant">
+                  La validation du paiement se fait depuis{" "}
+                  <Link
+                    to="/admin/paiements"
+                    className="font-semibold text-secondary underline-offset-2 hover:underline"
+                  >
+                    l'écran Paiements
+                  </Link>{" "}
+                  (vérification manuelle de la référence).
+                </p>
+              )}
+              {nextStatusOptions.length === 0 && (
+                <p className="text-label-sm text-on-surface-variant">
+                  Aucun changement de statut autorisé dans cet état.
+                </p>
+              )}
+              {nextStatusOptions.length > 0 && (
+                <Field label="Nouveau statut">
+                  <Select
+                    value={nextStatus}
+                    onChange={(e) => setNextStatus(e.target.value as OrderStatus)}
+                  >
+                    <option value="">Choisir…</option>
+                    {nextStatusOptions.map((value) => (
                       <option key={value} value={value}>
-                        {meta.label}
+                        {ORDER_STATUS[value]?.label}
                       </option>
                     ))}
-                </Select>
-              </Field>
+                  </Select>
+                </Field>
+              )}
               <Field label="Commentaire">
                 <Textarea
                   rows={3}

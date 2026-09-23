@@ -6,11 +6,6 @@ import { LessThan, Repository } from 'typeorm';
 import { Notification } from '../../../notifications/entities/notification.entity';
 import { QUEUE_NAMES, type OrderNotificationJobData } from '../queue.constants';
 
-/**
- * Worker de notifications.
- * L'écriture en base est faite par NotificationService (dans la transaction
- * métier) ; ce worker gère les traitements différés : relance, purge, etc.
- */
 @Processor(QUEUE_NAMES.NOTIFICATIONS)
 export class NotificationProcessor extends WorkerHost implements OnModuleDestroy {
   private readonly logger = new Logger(NotificationProcessor.name);

@@ -1,12 +1,4 @@
-/**
- * Constantes métier du frontend.
- *
- * Ces valeurs **reflètent** la configuration serveur, elles ne la remplacent
- * pas : le backend recalcule systématiquement frais de port et totaux (§87).
- * Elles servent uniquement à l'affichage et à la validation d'ergonomie.
- *
- * Unité : **ariary malgache (MGA), entiers** (§88).
- */
+
 
 import type {
   MobileMoneyProvider,
@@ -70,11 +62,6 @@ export interface PaymentProviderMeta {
   initials: string;
 }
 
-/**
- * Les expressions ci-dessous reprennent exactement les validateurs du backend
- * (`backend/src/payments/providers/mobile-money.providers.ts`) afin qu'un
- * utilisateur ne puisse pas saisir une référence vouée au rejet serveur.
- */
 export const PAYMENT_PROVIDERS: PaymentProviderMeta[] = [
   {
     id: "mvola",
@@ -185,6 +172,26 @@ export const ORDER_STATUS: Record<OrderStatus, OrderStatusMeta> = {
     step: 0,
     description: "Le paiement n'a pas pu être vérifié.",
   },
+};
+
+/** Transitions de statut gérables depuis l'écran admin « Commandes ».
+ *  Miroir de la matrice serveur (§64), réduit aux statuts qu'un administrateur
+ *  peut réellement appliquer via `PATCH /orders/:id/status` :
+ *  - « paid » est exclu (verrou anti-fraude : il ne s'obtient que par la
+ *    vérification de la référence Mobile Money dans Paiements) ;
+ *  - le cycle de paiement (payment_submitted / rejected / pending_payment)
+ *    est exclu car il doit rester cohérent avec l'enregistrement Payment.
+ */
+export const ADMIN_ORDER_TRANSITIONS: Partial<Record<OrderStatus, OrderStatus[]>> = {
+  pending_payment: ["cancelled"],
+  payment_submitted: ["cancelled"],
+  paid: ["processing", "cancelled"],
+  processing: ["ready", "shipped", "cancelled"],
+  ready: ["shipped", "cancelled"],
+  shipped: ["delivered"],
+  delivered: [],
+  cancelled: [],
+  rejected: [],
 };
 
 export const ORDER_STEPS: string[] = [

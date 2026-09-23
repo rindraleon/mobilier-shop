@@ -86,15 +86,6 @@ export class OrdersService {
 
   /* -------------------------------- Création -------------------------------- */
 
-  /**
-   * Crée une commande à partir du panier serveur (ou d'articles explicites).
-   *
-   * Garanties :
-   *  - authentification obligatoire (contrôlée par le guard) ;
-   *  - montants recalculés côté serveur ;
-   *  - stock vérifié puis décrémenté dans la même transaction ;
-   *  - protection des doublons via Idempotency-Key.
-   */
   async create(
     userId: string,
     dto: CreateOrderDto,
@@ -201,7 +192,7 @@ export class OrdersService {
         shippingCost,
         total,
         currency: this.config.get<string>('commerce.currency') ?? 'MGA',
-        shippingAddress: shippingAddress as OrderAddressSnapshot,
+        shippingAddress: shippingAddress,
         customerName: shippingAddress.fullName || `${user.firstName} ${user.lastName}`.trim(),
         customerEmail: user.email,
         customerPhone: shippingAddress.phone || user.phone,
@@ -413,9 +404,6 @@ export class OrdersService {
       throw BusinessException.notFound('Commande introuvable.', ErrorCode.ORDER_NOT_FOUND);
     }
 
-    // Le paiement est exposé ici (propriété non persistée) pour éviter au
-    // frontend un second aller-retour. Un vendeur ne voit pas le paiement
-    // global : il consulte /seller/payments pour ses propres lignes.
     const attachPayment = async (): Promise<Order> => {
       const payment = await this.dataSource.getRepository(Payment).findOne({
         where: { orderId: order.id },
@@ -426,6 +414,7 @@ export class OrdersService {
     };
 
     if (actor.role === UserRole.ADMIN) return attachPayment();
+
     if (actor.role === UserRole.SELLER) {
       const concernsSeller = order.items?.some((item) => item.sellerId === actor.sellerId);
       if (!concernsSeller) {
@@ -459,6 +448,22 @@ export class OrdersService {
     const order = await this.orders.findOne({ where: { id }, relations: { items: true } });
     if (!order) {
       throw BusinessException.notFound('Commande introuvable.', ErrorCode.ORDER_NOT_FOUND);
+    }
+
+    // Verrou anti-fraude : « payé » ne s'obtient qu'en vérifiant une référence Mobile Money.
+    // Ne jamais rouvrir ce passage par l'API, même pour un administrateur.
+    if (newStatus === OrderStatus.PAID) {
+      throw BusinessException.forbidden(
+        'Le statut « payé » ne peut être atteint que par la vérification du paiement.',
+        ErrorCode.ORDER_INVALID_TRANSITION,
+      );
+    }
+
+    if (actor.role === UserRole.CUSTOMER) {
+      throw BusinessException.forbidden(
+        "Le suivi d'une commande est réservé au vendeur et à l'administration. Pour votre part, utilisez l'annulation.",
+        ErrorCode.ORDER_NOT_OWNED,
+      );
     }
 
     if (actor.role === UserRole.SELLER) {

@@ -42,10 +42,6 @@ export class AuditService {
     private readonly repo: Repository<AuditLog>,
   ) {}
 
-  /**
-   * Enregistre une action. Ne doit jamais faire échouer le traitement métier :
-   * toute erreur est journalisée puis avalée.
-   */
   async log(entry: AuditEntry): Promise<void> {
     try {
       const log = this.repo.create({
@@ -55,14 +51,10 @@ export class AuditService {
         entityId: entry.entityId ?? null,
         metadata: entry.metadata ?? {},
         ipAddress: entry.request?.ip ?? null,
-        userAgent:
-          (entry.request?.headers?.['user-agent'] as string | undefined)?.slice(0, 400) ?? null,
+        userAgent: entry.request?.headers?.['user-agent']?.slice(0, 400) ?? null,
       });
       await this.repo.save(log);
     } catch (error) {
-      // Le journal d'audit ne doit jamais faire échouer l'action métier qui
-      // l'a déclenché : on trace via le Logger Nest (horodatage homogène,
-      // visible en supervision) et on poursuit.
       this.logger.error(
         `Écriture du journal d'audit impossible : ${(error as Error).message}`,
         (error as Error).stack,

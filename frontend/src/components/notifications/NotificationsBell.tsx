@@ -12,12 +12,6 @@ import NotificationItem from "./NotificationItem";
 import PageLoader from "../ui/PageLoader";
 import EmptyState from "../ui/EmptyState";
 
-/**
- * Cloche de notifications (§31).
- *
- * Le compteur de non-lus est une requête dédiée et légère, rafraîchie toutes
- * les 60 s : elle ne dépend pas du chargement de la liste complète.
- */
 export default function NotificationsBell() {
   const { isAuthenticated } = useAuth();
   const [open, setOpen] = useState<boolean>(false);

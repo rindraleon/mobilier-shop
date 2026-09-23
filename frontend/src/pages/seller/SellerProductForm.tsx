@@ -158,7 +158,7 @@ export default function SellerProductForm() {
         {isEdit ? "Modifier le produit" : "Nouveau produit"}
       </h1>
 
-      <form onSubmit={onSubmit} className="mt-6 grid gap-6 lg:grid-cols-3" noValidate>
+      <form onSubmit={(event) => void onSubmit(event)} className="mt-6 grid gap-6 lg:grid-cols-3" noValidate>
         <div className="space-y-6 lg:col-span-2">
           <section className="card p-5 sm:p-6">
             <h2 className="font-display text-headline-sm text-primary">Informations</h2>

@@ -12,13 +12,13 @@ import {
   Req,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Request } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
+import { requireUser } from '../common/utils/request.util';
 import { ProductsService } from './products.service';
 import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RequireApprovedSeller } from '../common/decorators/approved-seller.decorator';
 import { UserRole } from '../common/enums';
-import type { JwtUser } from '../common/decorators/current-user.decorator';
 import {
   CreateProductDto,
   ProductQueryDto,
@@ -69,7 +69,10 @@ export class ProductsController {
   })
   @ApiResponse({ status: 201, type: ProductResponseDto })
   @ApiResponse({ status: 403, description: 'Vendeur non approuvé.' })
-  async create(@Body() dto: CreateProductDto, @Req() request: Request): Promise<Product> {
+  async create(
+    @Body() dto: CreateProductDto,
+    @Req() request: AuthenticatedRequest,
+  ): Promise<Product> {
     const seller = request.seller;
     if (!seller) {
       throw new Error('SELLER_CONTEXT_MISSING');
@@ -86,9 +89,9 @@ export class ProductsController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateProductDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Product> {
-    const user = request.user as JwtUser;
+    const user = requireUser(request);
     const isAdmin = user.role === UserRole.ADMIN;
     const sellerId = request.seller?.id ?? user.sellerId ?? '';
     return this.productsService.updateForSeller(id, sellerId, dto, {
@@ -103,8 +106,8 @@ export class ProductsController {
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: '[Vendeur/Admin] Supprimer un produit (soft delete)' })
   @ApiResponse({ status: 403, description: 'Le produit ne vous appartient pas.' })
-  async remove(@Param('id') id: string, @Req() request: Request): Promise<void> {
-    const user = request.user as JwtUser;
+  async remove(@Param('id') id: string, @Req() request: AuthenticatedRequest): Promise<void> {
+    const user = requireUser(request);
     const isAdmin = user.role === UserRole.ADMIN;
     const sellerId = request.seller?.id ?? user.sellerId ?? '';
     await this.productsService.removeForSeller(id, sellerId, { isAdmin, request });
@@ -117,7 +120,7 @@ export class ProductsController {
   @ApiOperation({ summary: '[Vendeur approuvé] Mes produits (tous statuts)' })
   async myProducts(
     @Query() query: ProductQueryDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<Paginated<Product>> {
     const seller = request.seller;
     if (!seller) throw new Error('SELLER_CONTEXT_MISSING');

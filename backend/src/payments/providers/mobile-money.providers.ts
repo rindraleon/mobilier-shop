@@ -59,10 +59,6 @@ export class AirtelMoneyProvider extends BasePaymentProvider {
   }
 }
 
-/**
- * Fabrique de providers.
- * Brancher une API officielle = implémenter `checkReference` avec `automatic: true`.
- */
 export function getProvider(name: MobileMoneyProvider): BasePaymentProvider {
   switch (name) {
     case MobileMoneyProvider.MVOLA:

@@ -1,11 +1,5 @@
 import { z } from "zod";
 
-/**
- * Produit vendeur.
- *
- * Les montants sont des **entiers MGA** : on interdit d'emblée les décimales
- * pour éviter d'envoyer un prix que le serveur rejetterait (§88).
- */
 export const productSchema = z.object({
   name: z.string().trim().min(2, "Le nom doit contenir au moins 2 caractères.").max(200),
   shortDescription: z.string().trim().max(500).optional().or(z.literal("")),

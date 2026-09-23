@@ -87,7 +87,7 @@ export function useSaveAddress() {
   return useMutation({
     mutationFn: (input: AddressInput) => usersApi.createAddress(input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
       toast("Adresse enregistrée.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -102,7 +102,7 @@ export function useUpdateAddress() {
     mutationFn: ({ id, input }: { id: string; input: Partial<AddressInput> }) =>
       usersApi.updateAddress(id, input),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
       toast("Adresse mise à jour.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -116,7 +116,7 @@ export function useDeleteAddress() {
   return useMutation({
     mutationFn: (id: string) => usersApi.deleteAddress(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
       toast("Adresse supprimée.", "info");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -130,7 +130,7 @@ export function useSetDefaultAddress() {
   return useMutation({
     mutationFn: (id: string) => usersApi.setDefaultAddress(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.addresses.all });
       toast("Adresse par défaut mise à jour.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),

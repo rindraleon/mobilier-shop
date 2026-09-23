@@ -1,11 +1,4 @@
-/**
- * Formatage — devise et dates.
- *
- * §88 : la marketplace facture en **ariary malgache (MGA)**. Les montants
- * circulent sous forme d'**entiers** (unité monétaire minimale), jamais en
- * flottants, et le frontend ne fait que les *afficher* : tout calcul de total
- * est refait côté serveur (§21, §87).
- */
+
 
 const mgaFormatter = new Intl.NumberFormat("fr-FR", {
   maximumFractionDigits: 0,
@@ -64,7 +57,7 @@ export const initials = (name = ""): string =>
     .split(" ")
     .filter(Boolean)
     .slice(0, 2)
-    .map((w) => w[0]!.toUpperCase())
+    .map((w) => w[0].toUpperCase())
     .join("");
 
 /** Slugify côté UI (les slugs définitifs sont générés par le backend, §43). */

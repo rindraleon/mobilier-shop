@@ -1,7 +1,3 @@
-/**
- * Codes d'erreur métier stables, exposés dans l'enveloppe d'erreur JSON.
- * Le frontend peut s'appuyer sur ces codes (pas sur les messages).
- */
 export enum ErrorCode {
   // Générique
   INTERNAL_ERROR = 'INTERNAL_ERROR',

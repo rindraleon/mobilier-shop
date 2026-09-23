@@ -17,15 +17,6 @@ export interface WishlistProduct {
   addedAt: Date;
 }
 
-/**
- * Liste de souhaits (favoris).
- *
- * Règles métier :
- *  - une liste par utilisateur, créée à la volée ;
- *  - un produit ne peut apparaître qu'une seule fois (unicité en base) ;
- *  - l'identité vient du JWT : jamais un userId transmis par le frontend ;
- *  - un produit supprimé (soft delete) ne casse pas la lecture.
- */
 @Injectable()
 export class WishlistService {
   constructor(

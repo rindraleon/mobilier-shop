@@ -1,16 +1,17 @@
 import { StorageBucket } from '../common/enums';
 
-const toBoolean = (value: unknown, fallback = false): boolean => {
-  if (value === undefined || value === null || value === '') return fallback;
-  return String(value).toLowerCase() === 'true';
+const toBoolean = (value: string | undefined, fallback = false): boolean => {
+  if (value === undefined || value === '') return fallback;
+  return value.toLowerCase() === 'true';
 };
 
-const toNumber = (value: unknown, fallback: number): number => {
+const toNumber = (value: string | undefined, fallback: number): number => {
+  if (value === undefined || value === '') return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 };
 
-export default () => ({
+const configuration = () => ({
   nodeEnv: process.env.NODE_ENV ?? 'development',
   port: toNumber(process.env.PORT, 3000),
   apiPrefix: process.env.API_PREFIX ?? 'api',
@@ -105,3 +106,4 @@ export default () => ({
     freeShippingThreshold: toNumber(process.env.FREE_SHIPPING_THRESHOLD, 1500000),
   },
 });
+export default configuration;

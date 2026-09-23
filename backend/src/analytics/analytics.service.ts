@@ -23,18 +23,57 @@ export interface DateRange {
   to: Date;
 }
 
-/**
- * Normalise un montant renvoyé par PostgreSQL.
- *
- * `SUM(...)::bigint` dépasse la capacité d'un INTEGER JavaScript sérialisable
- * de façon fiable : le pilote `pg` renvoie donc une **chaîne** (« 8990000 »).
- * Sans cette conversion, l'API exposerait des montants en `string` et le
- * frontend devrait deviner le type — source de bugs d'affichage et de tri.
- */
 function toNumber(value: number | string | null | undefined): number {
   if (value === null || value === undefined) return 0;
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
+}
+
+/** Le pilote pg renvoie les sommes `::bigint` en chaîne : on garde l'union pour les normaliser. */
+interface CountRow {
+  count: number;
+}
+export interface SalesPointRow {
+  date: string;
+  revenue: number | string;
+  orders: number;
+}
+export interface TopProductRow {
+  productId: string;
+  name: string;
+  unitsSold: number;
+  revenue: number | string;
+}
+export interface CategorySalesRow {
+  categoryId: string;
+  name: string;
+  revenue: number | string;
+  unitsSold: number;
+}
+export interface SellerSalesRow {
+  sellerId: string;
+  shopName: string;
+  revenue: number | string;
+  unitsSold: number;
+  orders: number;
+}
+export interface StatusCountRow {
+  status: OrderStatus;
+  count: number;
+}
+export interface TopCustomerRow {
+  id: string;
+  email: string;
+  name: string;
+  revenue: number | string;
+  orders: number;
+}
+export interface SellerRecentOrderRow {
+  id: string;
+  orderNumber: string;
+  status: OrderStatus;
+  total: number | string;
+  createdAt: Date | string;
 }
 
 @Injectable()
@@ -102,14 +141,14 @@ export class AnalyticsService {
     const [customers, sellers, pendingSellers, activeProducts, pendingPayments, inProgressOrders] =
       await Promise.all([
         this.users.count({ where: { role: UserRole.CUSTOMER } }),
-        this.dataSource.query(
+        this.dataSource.query<CountRow[]>(
           `SELECT COUNT(*)::int AS count FROM sellers WHERE status = 'approved'`,
         ),
-        this.dataSource.query(
+        this.dataSource.query<CountRow[]>(
           `SELECT COUNT(*)::int AS count FROM sellers WHERE status = 'pending'`,
         ),
         this.products.count({ where: { status: ProductStatus.PUBLISHED } }),
-        this.dataSource.query(
+        this.dataSource.query<CountRow[]>(
           `SELECT COUNT(*)::int AS count FROM payments WHERE status = 'submitted'`,
         ),
         this.orders.count({
@@ -161,14 +200,6 @@ export class AnalyticsService {
     };
   }
 
-  /**
-   * Chiffre d'affaires et commandes agrégés par jour.
-   *
-   * ATTENTION : `dataSource.query()` avec un tableau de paramètres délègue au
-   * pilote `pg`, qui ne comprend que les marqueurs positionnels `$1…$n`.
-   * Mélanger un marqueur nommé (`:sellerId`) avec `$1` provoquait une
-   * `syntax error at or near ":"`. On reste donc intégralement positionnel.
-   */
   async salesOverTime(period: PeriodKey = '30d', from?: string, to?: string, sellerId?: string) {
     const range = this.resolveRange(period, from, to);
     const params: unknown[] = [REVENUE_STATUSES, range.from, range.to];
@@ -178,7 +209,7 @@ export class AnalyticsService {
       params.push(sellerId);
     }
 
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<SalesPointRow[]>(
       `SELECT to_char(date_trunc('day', o."created_at"), 'YYYY-MM-DD') AS date,
               COALESCE(SUM(o.total), 0)::bigint AS revenue,
               COUNT(DISTINCT o.id)::int AS orders
@@ -189,7 +220,7 @@ export class AnalyticsService {
         GROUP BY 1
         ORDER BY 1 ASC`,
       params,
-    )) as { date: string; revenue: number | string; orders: number }[];
+    );
 
     // SUM(...)::bigint est renvoyé en chaîne par le pilote pg : on normalise.
     return rows.map((row) => ({
@@ -206,7 +237,7 @@ export class AnalyticsService {
       where += ' AND oi."seller_id" = $3';
       params.push(sellerId);
     }
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<TopProductRow[]>(
       `SELECT oi."product_id" AS "productId",
               oi.name,
               SUM(oi.quantity)::int AS "unitsSold",
@@ -218,7 +249,7 @@ export class AnalyticsService {
         ORDER BY "unitsSold" DESC
         LIMIT $2`,
       params,
-    )) as { productId: string; name: string; unitsSold: number; revenue: number | string }[];
+    );
 
     return rows.map((row) => ({
       productId: row.productId,
@@ -230,7 +261,7 @@ export class AnalyticsService {
 
   async salesByCategory(period: PeriodKey = '30d') {
     const range = this.resolveRange(period);
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<CategorySalesRow[]>(
       `SELECT c.id AS "categoryId", c.name,
               COALESCE(SUM(oi."line_total"), 0)::bigint AS revenue,
               COALESCE(SUM(oi.quantity), 0)::int AS "unitsSold"
@@ -243,12 +274,7 @@ export class AnalyticsService {
         GROUP BY c.id, c.name
         ORDER BY revenue DESC`,
       [REVENUE_STATUSES, range.from, range.to],
-    )) as {
-      categoryId: string;
-      name: string;
-      revenue: number | string;
-      unitsSold: number;
-    }[];
+    );
 
     return rows.map((row) => ({
       categoryId: row.categoryId,
@@ -260,7 +286,7 @@ export class AnalyticsService {
 
   async salesBySeller(period: PeriodKey = '30d') {
     const range = this.resolveRange(period);
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<SellerSalesRow[]>(
       `SELECT s.id AS "sellerId", s."shop_name" AS "shopName",
               COALESCE(SUM(oi."line_total"), 0)::bigint AS revenue,
               COALESCE(SUM(oi.quantity), 0)::int AS "unitsSold",
@@ -273,13 +299,7 @@ export class AnalyticsService {
         GROUP BY s.id, s."shop_name"
         ORDER BY revenue DESC`,
       [REVENUE_STATUSES, range.from, range.to],
-    )) as {
-      sellerId: string;
-      shopName: string;
-      revenue: number | string;
-      unitsSold: number;
-      orders: number;
-    }[];
+    );
 
     return rows.map((row) => ({
       sellerId: row.sellerId,
@@ -291,12 +311,12 @@ export class AnalyticsService {
   }
 
   async ordersByStatus() {
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<StatusCountRow[]>(
       `SELECT o.status, COUNT(*)::int AS count
          FROM orders o
         GROUP BY o.status
         ORDER BY count DESC`,
-    )) as { status: OrderStatus; count: number }[];
+    );
 
     const result = {} as Record<OrderStatus, number>;
     for (const status of Object.values(OrderStatus)) result[status] = 0;
@@ -311,7 +331,7 @@ export class AnalyticsService {
       .where('u."created_at" BETWEEN :from AND :to', range)
       .getCount();
 
-    const topCustomers = await this.dataSource.query(
+    const topCustomers = await this.dataSource.query<TopCustomerRow[]>(
       `SELECT u.id, u.email,
               CONCAT(u."first_name", ' ', u."last_name") AS name,
               COALESCE(SUM(o.total), 0)::bigint AS revenue,
@@ -326,15 +346,7 @@ export class AnalyticsService {
 
     return {
       newCustomers,
-      topCustomers: (
-        topCustomers as {
-          id: string;
-          email: string;
-          name: string;
-          revenue: number | string;
-          orders: number;
-        }[]
-      ).map((row) => ({
+      topCustomers: topCustomers.map((row) => ({
         id: row.id,
         email: row.email,
         name: row.name,
@@ -380,7 +392,7 @@ export class AnalyticsService {
           .where('p."seller_id" = :sellerId', { sellerId })
           .andWhere('p.stock <= COALESCE(p."low_stock_threshold", 5)')
           .getCount(),
-        this.dataSource.query(
+        this.dataSource.query<SellerRecentOrderRow[]>(
           `SELECT o.id, o."order_number" AS "orderNumber", o.status, o.total, o."created_at" AS "createdAt"
              FROM orders o
             WHERE EXISTS (SELECT 1 FROM order_items oi WHERE oi."order_id" = o.id AND oi."seller_id" = $1)
@@ -408,13 +420,13 @@ export class AnalyticsService {
   }
 
   async sellerOrdersStats(sellerId: string) {
-    const rows = (await this.dataSource.query(
+    const rows = await this.dataSource.query<StatusCountRow[]>(
       `SELECT o.status, COUNT(DISTINCT o.id)::int AS count
          FROM orders o
          JOIN order_items oi ON oi."order_id" = o.id AND oi."seller_id" = $1
         GROUP BY o.status`,
       [sellerId],
-    )) as { status: OrderStatus; count: number }[];
+    );
     const result = {} as Record<OrderStatus, number>;
     for (const status of Object.values(OrderStatus)) result[status] = 0;
     for (const row of rows) result[row.status] = row.count;

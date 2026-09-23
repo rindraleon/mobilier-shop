@@ -1,11 +1,4 @@
-/**
- * Utilitaires pour les tests qui dialoguent avec une API **réelle**.
- *
- * Ces tests sont ignorés (`describe.skipIf`) si aucun backend ne répond sur
- * `API_ORIGIN`, afin que `npm run test` reste vert en CI, sans serveur. En
- * développement, ils constituent la seule preuve automatisée qu'un parcours
- * complet — ici le paiement — est réellement praticable dans l'interface.
- */
+
 
 /** Origine du backend de test. Surchargeable via `VITE_E2E_API`. */
 export const API_ORIGIN: string =
@@ -55,11 +48,6 @@ export interface LiveFetchHandle {
   restore: () => void;
 }
 
-/**
- * Remplace `fetch` par une version qui
- *  - préfixe les URLs relatives (`/api/...`) par l'origine du backend ;
- *  - rejoue les cookies, puisque jsdom n'a pas de jar persistant.
- */
 export function installLiveFetch(jar: CookieJar): LiveFetchHandle {
   const original = globalThis.fetch;
   const calls: string[] = [];
@@ -88,9 +76,9 @@ export function installLiveFetch(jar: CookieJar): LiveFetchHandle {
     });
   };
 
-  globalThis.fetch = live as typeof fetch;
+  globalThis.fetch = live;
   if (typeof window !== "undefined") {
-    window.fetch = live as typeof fetch;
+    window.fetch = live;
   }
 
   return {
@@ -98,7 +86,7 @@ export function installLiveFetch(jar: CookieJar): LiveFetchHandle {
     restore: () => {
       globalThis.fetch = original;
       if (typeof window !== "undefined") {
-        window.fetch = original as typeof fetch;
+        window.fetch = original;
       }
     },
   };
@@ -137,10 +125,6 @@ export interface OrderFixture {
   jar: CookieJar;
 }
 
-/**
- * Crée une commande réelle `pending_payment` pour `customer@example.local`,
- * prête à recevoir une référence de paiement.
- */
 export async function createPendingOrder(): Promise<OrderFixture> {
   const jar = new CookieJar();
   const handle = installLiveFetch(jar);

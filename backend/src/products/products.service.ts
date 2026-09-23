@@ -274,10 +274,6 @@ export class ProductsService {
 
   /* ---------------------------------- Stock --------------------------------- */
 
-  /**
-   * Décrémente le stock avec verrouillage pessimiste.
-   * À appeler dans une transaction (création de commande).
-   */
   async decrementStock(
     manager: DataSource | { query: never },
     items: { productId: string; quantity: number }[],

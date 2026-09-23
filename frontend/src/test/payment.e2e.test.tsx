@@ -15,24 +15,6 @@ import {
   type OrderFixture,
 } from "./liveApi";
 
-/**
- * QA de bout en bout du **parcours de paiement** (§27, §66, §87).
- *
- * Ce test ne simule pas le réseau : il monte la véritable application et
- * dialogue avec le backend, comme le ferait un client. Il garantit donc que la
- * dernière étape — saisir une référence Mobile Money et la soumettre — est
- * réellement atteignable dans l'interface, y compris :
- *
- *  - l'enchaînement `panier → commande → page de paiement` ;
- *  - le rendu du formulaire (opérateurs servis par `GET /payments/providers`) ;
- *  - la validation locale de la référence ;
- *  - l'appel réel `POST /api/payments/orders/:id` ;
- *  - l'affichage de l'état « en cours de vérification » (jamais « payé »).
- *
- * Il est automatiquement ignoré si aucun backend ne répond (voir `isApiUp`),
- * pour que `npm run test` reste vert en CI sans serveur.
- */
-
 const apiUp = await isApiUp();
 
 describe.skipIf(!apiUp)("Parcours de paiement — application réelle", () => {

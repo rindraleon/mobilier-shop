@@ -22,13 +22,6 @@ export function useOrder(id: string | undefined) {
   });
 }
 
-/**
- * Création de commande.
- *
- * `Idempotency-Key` générée côté client : un double-clic sur « Commander »
- * ne peut pas créer deux commandes (§89). Le backend recalcule le total —
- * aucun montant n'est envoyé par le frontend (§87).
- */
 export function useCreateOrder() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -37,11 +30,8 @@ export function useCreateOrder() {
     mutationFn: (input: CreateOrderInput) =>
       ordersApi.create(input, crypto.randomUUID()),
     onSuccess: (order) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      // Pas de `setQueryData` ici : la réponse de création ne contient ni
-      // `payment` ni `statusHistory`. La page de suivi recharge la commande
-      // complète via `GET /orders/:id`.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.cart.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast("Commande " + order.orderNumber + " créée.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -58,7 +48,7 @@ export function useCancelOrder() {
     onSuccess: () => {
       // `orders.all` est un préfixe de `orders.detail(id)` : l'invalidation
       // recharge donc aussi la page de suivi, avec `payment` et `statusHistory`.
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
       toast("Commande annulée. Les articles ont été remis en stock.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -81,11 +71,11 @@ export function useUpdateOrderStatus() {
       comment?: string;
     }) => ordersApi.updateStatus(id, status, comment),
     onSuccess: (order) => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
-      queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seller.all });
       // La réponse de transition est partielle : on recharge le détail
       // complet (avec `payment` et `statusHistory`) plutôt que de l'écrire.
-      queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.orders.detail(order.id) });
       toast("Statut mis à jour.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),

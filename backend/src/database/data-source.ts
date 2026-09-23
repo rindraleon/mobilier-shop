@@ -1,10 +1,6 @@
-/**
- * Source de données utilisée par la CLI TypeORM (migrations & seeds).
- * Usage : npm run migration:run / migration:generate / seed
- */
 import { config as loadEnv } from 'dotenv';
 import { DataSource } from 'typeorm';
-import * as path from 'path';
+import * as path from 'node:path';
 
 loadEnv();
 

@@ -2,22 +2,6 @@ import { Component } from "react";
 import type { ErrorInfo, ReactNode } from "react";
 import { AlertTriangle, ArrowLeft, RefreshCw } from "lucide-react";
 
-/**
- * Frontière d'erreur React.
- *
- * Sans ce composant, une exception levée pendant le rendu démonte **tout**
- * l'arbre React et laisse une page blanche : aucun message, aucun moyen de
- * récupération, et l'utilisateur croit à une panne du site entier.
- *
- * Le repli est volontairement écrit en balisage autonome, sans aucun
- * composant de la bibliothèque d'UI : si c'est précisément l'un d'eux qui est
- * en cause, l'écran d'erreur doit pouvoir s'afficher quand même.
- *
- * Deux niveaux sont utilisés dans `App.tsx` :
- *  - une frontière **racine**, ultime rempart ;
- *  - une frontière **par espace** (public, client, vendeur, admin), afin
- *    qu'un écran défaillant n'emporte pas les autres.
- */
 interface ErrorBoundaryProps {
   children: ReactNode;
   /** Nom de la zone protégée, affiché dans le repli. */
@@ -44,7 +28,6 @@ export default class ErrorBoundary extends Component<
     // En production, ce point d'entrée est celui d'un outil de supervision
     // (Sentry, OpenTelemetry…) : on y pousse l'erreur et la pile du composant.
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
       console.error("[ErrorBoundary]", error, info.componentStack);
     }
   }

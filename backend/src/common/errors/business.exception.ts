@@ -7,10 +7,6 @@ export interface BusinessExceptionOptions {
   cause?: unknown;
 }
 
-/**
- * Erreur métier transportant un code stable.
- * Le filtre global la convertit en enveloppe JSON homogène.
- */
 export class BusinessException extends HttpException {
   public readonly code: string;
   public readonly details?: unknown;
@@ -29,7 +25,7 @@ export class BusinessException extends HttpException {
       status,
       { cause: options.cause },
     );
-    this.code = (options.code ?? ErrorCode.BAD_REQUEST) as string;
+    this.code = options.code ?? ErrorCode.BAD_REQUEST;
     this.details = options.details;
   }
 

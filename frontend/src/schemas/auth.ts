@@ -1,14 +1,5 @@
 import { z } from "zod";
 
-/**
- * Validation frontend (§53).
- *
- * Ces règles **doublent** celles du backend, elles ne les remplacent pas :
- * elles servent à donner un retour immédiat à l'utilisateur. Toute règle
- * métier contraignante est également appliquée côté serveur
- * (`class-validator` + `ValidationPipe`), seul endroit digne de confiance.
- */
-
 /** Mêmes contraintes que `RegisterDto` (min 8, au moins une lettre et un chiffre). */
 export const passwordSchema = z
   .string()

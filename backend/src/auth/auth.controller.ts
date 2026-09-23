@@ -1,7 +1,8 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import type { Request, Response } from 'express';
+import type { Response } from 'express';
+import type { AuthenticatedRequest } from '../common/interfaces/authenticated-request.interface';
 import { AuthService } from './auth.service';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser, type JwtUser } from '../common/decorators/current-user.decorator';
@@ -33,7 +34,7 @@ export class AuthController {
   @ApiResponse({ status: 409, description: 'Email déjà utilisé.' })
   async register(
     @Body() dto: RegisterDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
     const result = await this.authService.register(dto, request);
@@ -50,7 +51,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Identifiants invalides.' })
   async login(
     @Body() dto: LoginDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
     const result = await this.authService.login(dto, request);
@@ -71,7 +72,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Refresh token invalide, expiré ou révoqué.' })
   async refresh(
     @Body() dto: RefreshTokenDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<AuthResponseDto> {
     const token = dto.refreshToken ?? (request.cookies?.['mobilier_rt'] as string | undefined);
@@ -87,7 +88,7 @@ export class AuthController {
   @ApiResponse({ status: 200, type: MessageResponseDto })
   async logout(
     @Body() dto: RefreshTokenDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
     @Res({ passthrough: true }) response: Response,
   ): Promise<MessageResponseDto> {
     const token = dto.refreshToken ?? (request.cookies?.['mobilier_rt'] as string | undefined);
@@ -115,7 +116,7 @@ export class AuthController {
   @ApiResponse({ status: 200, type: MessageResponseDto })
   async forgotPassword(
     @Body() dto: ForgotPasswordDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<MessageResponseDto> {
     await this.authService.forgotPassword(dto.email, request);
     return {
@@ -130,7 +131,7 @@ export class AuthController {
   @ApiResponse({ status: 200, type: MessageResponseDto })
   async resetPassword(
     @Body() dto: ResetPasswordDto,
-    @Req() request: Request,
+    @Req() request: AuthenticatedRequest,
   ): Promise<MessageResponseDto> {
     await this.authService.resetPassword(dto.token, dto.password, request);
     return { message: 'Mot de passe réinitialisé. Vous pouvez vous connecter.' };

@@ -8,10 +8,6 @@ interface RevealProps {
   as?: ElementType;
 }
 
-/**
- * Animation d'apparition au scroll (composant réutilisable).
- * <Reveal delay={0.2}>…</Reveal>
- */
 export default function Reveal({ children, delay = 0, className = "", as }: RevealProps) {
   const ref = useRef<HTMLElement | null>(null);
 
@@ -31,7 +27,7 @@ export default function Reveal({ children, delay = 0, className = "", as }: Reve
     return () => observer.disconnect();
   }, []);
 
-  const Tag = (as ?? "div") as ElementType;
+  const Tag = (as ?? "div");
 
   return (
     <Tag ref={ref} style={{ transitionDelay: `${delay}s` }} className={`fade-up ${className}`}>

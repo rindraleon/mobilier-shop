@@ -1,12 +1,5 @@
 import type { CartItem, Product } from "../types/api";
 
-/**
- * Première image affichable d'un produit.
- *
- * Le backend stocke `objectKey` (MinIO) **et** `url`. Tant que MinIO n'est pas
- * servi publiquement, les images de démonstration pointent vers des fichiers
- * statiques du frontend : on utilise donc `url` en priorité.
- */
 export function productImageUrl(product: {
   images?: { url?: string | null; isPrimary?: boolean; sortOrder?: number }[];
   imageUrl?: string | null;

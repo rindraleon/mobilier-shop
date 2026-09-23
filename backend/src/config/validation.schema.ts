@@ -1,15 +1,5 @@
 import * as Joi from 'joi';
 
-/**
- * Validation stricte des variables d'environnement au démarrage.
- *
- * Pourquoi : un backend qui démarre avec une configuration invalide ou des
- * secrets par défaut en production est une faille de sécurité. Mieux vaut
- * échouer immédiatement (fail fast) avec un message explicite.
- *
- * Les secrets ne sont jamais exposés au frontend : ils ne quittent jamais le
- * processus Node (aucune valeur de la configuration n'est renvoyée par l'API).
- */
 export const validationSchema = Joi.object({
   NODE_ENV: Joi.string().valid('development', 'production', 'test').default('development'),
   PORT: Joi.number().integer().min(1).max(65535).default(3000),
@@ -83,10 +73,6 @@ export const validationSchema = Joi.object({
   FREE_SHIPPING_THRESHOLD: Joi.number().integer().min(0).default(1500000),
 }).unknown(true);
 
-/**
- * En production, on refuse de démarrer avec des secrets faibles/absents.
- * Complète le schéma Joi (qui ne peut pas comparer deux secrets entre eux).
- */
 export function assertProductionSecrets(env: NodeJS.ProcessEnv): void {
   if (env.NODE_ENV !== 'production') return;
 

@@ -9,15 +9,6 @@ interface GuardProps {
   children: ReactNode;
 }
 
-/**
- * Gardes de routing **côté client** (§49).
- *
- * Rappel essentiel : ces gardes ne sont qu'une commodité d'ergonomie. Elles
- * évitent d'afficher une page qui va échouer. La sécurité réelle est
- * exclusivement assurée par les guards NestJS (`JwtAuthGuard`, `RolesGuard`,
- * `SellerStatusGuard`) — contourner le frontend ne donne accès à rien.
- */
-
 /** Toute page nécessitant une session active. */
 export function RequireAuth({ children }: GuardProps) {
   const { isAuthenticated, isBooting } = useAuth();

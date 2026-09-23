@@ -1,28 +1,11 @@
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import {
-  Bell,
-  Heart,
-  LayoutDashboard,
-  LogOut,
-  MapPin,
-  Package,
-  Store,
-  User,
-  Warehouse,
-} from "lucide-react";
+import { Outlet } from "react-router-dom";
+import { Bell, Heart, LayoutDashboard, MapPin, Package, Store, User, Warehouse } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+
+import DashboardShell, { type ShellNavItem } from "./DashboardShell";
 import { useAuth } from "../../lib/auth/AuthProvider";
-import Avatar from "../ui/Avatar";
-import Breadcrumbs from "../ui/Breadcrumbs";
 
-interface ClientNavItem {
-  to: string;
-  icon: LucideIcon;
-  label: string;
-  end?: boolean;
-}
-
-const items: ClientNavItem[] = [
+const baseItems: ShellNavItem[] = [
   { to: "/espace-client", icon: LayoutDashboard, label: "Aperçu", end: true },
   { to: "/espace-client/commandes", icon: Package, label: "Mes commandes" },
   { to: "/espace-client/notifications", icon: Bell, label: "Notifications" },
@@ -31,94 +14,46 @@ const items: ClientNavItem[] = [
   { to: "/espace-client/profil", icon: User, label: "Mon profil" },
 ];
 
+const menuItems: { to: string; label: string; icon: LucideIcon }[] = [
+  { to: "/espace-client/profil", label: "Mon profil", icon: User },
+  { to: "/espace-client/adresses", label: "Mes adresses", icon: MapPin },
+];
+
+const breadcrumbs = [{ label: "Accueil", to: "/" }, { label: "Espace client" }];
+
 export default function ClientLayout() {
-  const { user, isAdmin, isSeller, isApprovedSeller, logout } = useAuth();
-  const navigate = useNavigate();
+  const { user, isAdmin, isSeller, isApprovedSeller } = useAuth();
 
   if (!user) return null;
 
+  const items = [...baseItems];
+  if (!isSeller) {
+    items.push({ to: "/devenir-vendeur", icon: Store, label: "Devenir vendeur" });
+  }
+  if (isSeller) {
+    items.push({
+      to: isApprovedSeller ? "/vendeur" : "/devenir-vendeur",
+      icon: Store,
+      label: "Espace vendeur",
+    });
+  }
+  if (isAdmin) {
+    items.push({ to: "/admin", icon: Warehouse, label: "Espace admin" });
+  }
+
   return (
-    <div className="container-app py-8 lg:py-12">
-      <Breadcrumbs items={[{ label: "Accueil", to: "/" }, { label: "Espace client" }]} />
-      <div className="mt-6 flex flex-col gap-8 lg:flex-row">
-        <aside className="lg:w-64 lg:shrink-0">
-          <div className="card p-4 lg:sticky lg:top-24">
-            <div className="flex items-center gap-3 border-b border-surface-container-highest pb-4">
-              <Avatar name={user.fullName} size="lg" />
-              <div className="min-w-0">
-                <p className="truncate font-display text-headline-sm text-primary">{user.fullName}</p>
-                <p className="truncate text-label-sm text-on-surface-variant">{user.email}</p>
-              </div>
-            </div>
-
-            <nav
-              className="no-scrollbar mt-4 flex gap-1 overflow-x-auto lg:flex-col"
-              aria-label="Navigation espace client"
-            >
-              {items.map(({ to, icon: Icon, label, end }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  end={end}
-                  className={({ isActive }) =>
-                    `flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-body-sm font-medium transition-colors ${
-                      isActive
-                        ? "bg-secondary-container text-on-secondary-container"
-                        : "text-on-surface-variant hover:bg-surface-container hover:text-primary"
-                    }`
-                  }
-                >
-                  <Icon size={18} /> {label}
-                </NavLink>
-              ))}
-
-              {/* Un client peut demander à devenir vendeur (§14). */}
-              {!isSeller && (
-                <NavLink
-                  to="/devenir-vendeur"
-                  className="flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-body-sm font-medium text-secondary transition-colors hover:bg-surface-container"
-                >
-                  <Store size={18} /> Devenir vendeur
-                </NavLink>
-              )}
-
-              {isSeller && (
-                <NavLink
-                  to={isApprovedSeller ? "/vendeur" : "/devenir-vendeur"}
-                  className="flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-body-sm font-medium text-secondary transition-colors hover:bg-surface-container"
-                >
-                  <Store size={18} /> Espace vendeur
-                </NavLink>
-              )}
-
-              {isAdmin && (
-                <NavLink
-                  to="/admin"
-                  className="flex shrink-0 items-center gap-3 rounded-lg px-3.5 py-2.5 text-body-sm font-medium text-secondary transition-colors hover:bg-surface-container"
-                >
-                  <Warehouse size={18} /> Espace admin
-                </NavLink>
-              )}
-            </nav>
-
-            <div className="mt-4 border-t border-surface-container-highest pt-4">
-              <button
-                onClick={() => {
-                  void logout();
-                  navigate("/");
-                }}
-                className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-body-sm font-medium text-red-600 transition-colors hover:bg-red-50"
-              >
-                <LogOut size={18} /> Se déconnecter
-              </button>
-            </div>
-          </div>
-        </aside>
-
-        <div className="min-w-0 flex-1">
-          <Outlet />
-        </div>
-      </div>
-    </div>
+    <DashboardShell
+      variant="light"
+      title="Espace client"
+      brandInitial={user.firstName?.charAt(0)?.toUpperCase() ?? "C"}
+      brandName={user.fullName}
+      brandTagline={user.email}
+      items={items}
+      menuItems={menuItems}
+      notificationsTo="/espace-client/notifications"
+      breadcrumbs={breadcrumbs}
+    >
+      <Outlet />
+    </DashboardShell>
   );
 }

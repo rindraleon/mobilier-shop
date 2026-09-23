@@ -5,9 +5,6 @@ interface BarChartProps {
   formatValue?: (value: number) => string;
 }
 
-/**
- * Graphique en barres sans dépendance externe (simple et responsive).
- */
 export default function BarChart({ data, formatValue }: BarChartProps) {
   const max = Math.max(...data.map((d) => d.value), 1);
   const fmt = (v: number): string => (formatValue ? formatValue(v) : String(v));

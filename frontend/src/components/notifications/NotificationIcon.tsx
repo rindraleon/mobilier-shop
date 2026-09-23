@@ -10,10 +10,6 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
-/**
- * Icône et couleur associées à chaque type de notification.
- * La liste reprend exactement l'enum serveur `NotificationType`.
- */
 export const NOTIFICATION_META: Record<string, { icon: LucideIcon; color: string }> = {
   ORDER_CREATED: { icon: Package, color: "text-sky-600" },
   ORDER_PAID: { icon: Wallet, color: "text-emerald-600" },

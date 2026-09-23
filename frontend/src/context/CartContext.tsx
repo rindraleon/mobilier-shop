@@ -59,7 +59,7 @@ function save(key: string, value: unknown): void {
   }
 }
 
-export function CartProvider({ children }: { children: ReactNode }) {
+export function CartProvider({ children }: Readonly<{ children: ReactNode }>) {
   const { products } = useStore();
   const { toast } = useToast();
 

@@ -100,7 +100,7 @@ export default function ClientProfile() {
           <User size={18} className="text-secondary" /> Informations personnelles
         </h2>
 
-        <form onSubmit={onProfileSubmit} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
+        <form onSubmit={(event) => void onProfileSubmit(event)} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
           <Field label="Prénom" required error={profileForm.formState.errors.firstName?.message}>
             <Input {...profileForm.register("firstName")} />
           </Field>
@@ -127,7 +127,7 @@ export default function ClientProfile() {
           <KeyRound size={18} className="text-secondary" /> Changer de mot de passe
         </h2>
 
-        <form onSubmit={onPasswordSubmit} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
+        <form onSubmit={(event) => void onPasswordSubmit(event)} className="mt-5 grid gap-4 sm:grid-cols-2" noValidate>
           <Field
             label="Mot de passe actuel"
             required

@@ -45,8 +45,8 @@ export default function SellerProfile() {
         addressLine: input.addressLine || undefined,
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.seller.profile });
-      queryClient.invalidateQueries({ queryKey: queryKeys.sellerApplication });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.seller.profile });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.sellerApplication });
       toast("Boutique mise à jour.");
     },
     onError: (error: unknown) => toast(errorMessage(error), "error"),
@@ -90,7 +90,7 @@ export default function SellerProfile() {
         </p>
       )}
 
-      <form onSubmit={onSubmit} className="card mt-6 space-y-4 p-5 sm:p-6" noValidate>
+      <form onSubmit={(event) => void onSubmit(event)} className="card mt-6 space-y-4 p-5 sm:p-6" noValidate>
         <h2 className="font-display text-headline-sm text-primary">Informations</h2>
 
         <Field label="Nom de la boutique" required error={form.formState.errors.shopName?.message}>

@@ -36,13 +36,6 @@ import ClientNotifications from "./pages/client/ClientNotifications";
 import ClientProfile from "./pages/client/ClientProfile";
 import ClientAddresses from "./pages/client/ClientAddresses";
 
-/**
- * Découpage du bundle (§ performances).
- *
- * Les espaces vendeur et administrateur sont chargés à la demande : un
- * visiteur du catalogue ne télécharge jamais ces écrans ni leurs dépendances
- * (tableaux, graphiques, formulaires).
- */
 const SellerDashboard = lazy(() => import("./pages/seller/SellerDashboard"));
 const SellerProducts = lazy(() => import("./pages/seller/SellerProducts"));
 const SellerProductForm = lazy(() => import("./pages/seller/SellerProductForm"));
@@ -72,13 +65,6 @@ function RouteFallback() {
   );
 }
 
-/**
- * Frontière d'erreur d'un espace.
- *
- * La clé sur le chemin courant réinitialise le repli à chaque navigation :
- * sans elle, une erreur sur `/admin/paiements` resterait affichée après un
- * passage sur `/admin/clients`.
- */
 function SpaceBoundary({ space, children }: { space: string; children: ReactNode }) {
   const { pathname } = useLocation();
   return (

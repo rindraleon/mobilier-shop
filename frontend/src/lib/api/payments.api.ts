@@ -21,11 +21,7 @@ export const paymentsApi = {
   /** Opérateurs disponibles + format de référence attendu (§27). */
   providers: () => api.get<PaymentProviderInfo[]>("/payments/providers"),
 
-  /**
-   * Soumet une référence Mobile Money. Le paiement reste `SUBMITTED` jusqu'à
-   * vérification manuelle par un administrateur : jamais de validation
-   * automatique simulée.
-   */
+  
   submitForOrder: (orderId: string, input: SubmitPaymentInput, idempotencyKey?: string) =>
     api.post<Payment>("/payments/orders/" + orderId, input, { idempotencyKey }),
 
